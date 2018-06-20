@@ -35,9 +35,9 @@ def pull_data(output: str, connection: models.Connection) -> None:
 
 
 def insert_data(
-        owners: typing.IO[str],
-        domains: typing.IO[str],
-        ciphers: typing.IO[str],
+        owners: typing.Optional[typing.IO[str]],
+        domains: typing.Optional[typing.IO[str]],
+        ciphers: typing.Optional[typing.IO[str]],
         upsert: bool,
         connection: models.Connection
     ) -> None:
