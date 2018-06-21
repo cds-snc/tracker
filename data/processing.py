@@ -61,7 +61,11 @@ def run(date: typing.Optional[str], connection_string: str):
     # Capture manual exclusions and pull out some high-level data from pshtt.
     for domain_name in scan_data:
         # Pull out a few pshtt.csv fields as general domain-level metadata.
-        pshtt = scan_data[domain_name].get("pshtt", None)
+        domain_data = scan_data.get(domain_name)
+        if not domain_data:
+            continue
+
+        pshtt = domain_data.get("pshtt", None)
         if pshtt is None:
             # generally means scan was on different domains.csv, but
             # invalid domains can hit this.
@@ -209,7 +213,6 @@ def load_domain_data() -> typing.Tuple[typing.Set, typing.Dict]:
                     "organization_name_fr": organization_name_fr,
                     "organization_slug": organization_slug,
                     "sources": ["canada-gov"],
-                    "is_parent": True,
                     "is_owner": True,
                     "exclude": {},
                 }
@@ -277,7 +280,10 @@ def load_scan_data(domains: typing.Set[str]) -> typing.Dict:
 
 def map_subdomains(scan_data, domain_map):
     for domain in scan_data:
-        if boolean_for(scan_data[domain]['pshtt']["Live"]) and not domain_map[domain]["is_owner"]:
+        if boolean_for(scan_data[domain]['pshtt']["Live"]):
+            continue
+
+        if not domain_map[domain]["is_owner"]:
             parts = domain.split('.')
             subdomain = domain
             while parts and (subdomain not in domain_map or not domain_map[subdomain]["is_owner"]):
@@ -295,16 +301,22 @@ def map_subdomains(scan_data, domain_map):
                 continue
 
             parent = '.'.join(parts)
-            if scan_data[parent].get("subdomains") is None:
-                scan_data[parent]["subdomains"] = []
-            scan_data[parent]["subdomains"].append(domain)
+            # If the owner was not scanned, store the subdomains
+            # and let all subdomains become parents
+            subdomains = scan_data.setdefault(parent, {'fake': True}).setdefault("subdomains", [])
+            subdomains.append(domain)
             domain_map[domain].update({
                 "base_domain": parent,
-                "is_parent": False,
+                "is_parent": scan_data.get('fake') is True,
                 "organization_slug": domain_map[parent]["organization_slug"],
                 "organization_name_en": domain_map[parent]["organization_name_en"],
                 "organization_name_fr": domain_map[parent]["organization_name_fr"],
             })
+        else:
+            domain_map[domain].update({
+                "is_parent": True
+            })
+
 
 
 # Given the domain data loaded in from CSVs, draw conclusions,
@@ -322,41 +334,28 @@ def process_domains(domains, scan_data, acceptable_ciphers):
             "eligible": False,  # domain eligible itself (is it live?)
             "eligible_zone": False,  # zone eligible (itself or any live subdomains?)
         }
-        eligible_children = []
 
         # No matter what, put the preloaded state onto the parent,
         # since even an unused domain can always be preloaded.
-        https_parent["preloaded"] = preloaded_or_not(
-            scan_data[domain_name]["pshtt"]
-        )
+        parent_preloaded = preloaded_or_not(
+            scan_data[domains[domain_name]['base_domain']]["pshtt"]
+        ) if not domains[domain_name]["is_parent"] else 0
 
-        # Tally subdomains first, so we know if the parent zone is
-        # definitely eligible as a zone even if not as a website
-        for subdomain_name in scan_data[domain_name].get("subdomains", []):
-
-            if eligible_for_https(domains[subdomain_name]):
-                eligible_children.append(subdomain_name)
-                domains[subdomain_name]["https"] = https_behavior_for(
-                    scan_data[subdomain_name]["pshtt"],
-                    scan_data[subdomain_name].get("sslyze", None),
-                    acceptable_ciphers,
-                    parent_preloaded=https_parent["preloaded"],
-                )
-
-        # ** syntax merges dicts, available in 3.5+
         if eligible_for_https(domains[domain_name]):
             https_parent = {
                 **https_parent,
                 **https_behavior_for(
                     scan_data[domain_name]["pshtt"],
-                    scan_data[domain_name].get("sslyze", None),
+                    scan_data[domain_name].get("sslyze"),
                     acceptable_ciphers,
-                ),
+                    parent_preloaded
+                )
             }
-            https_parent["eligible_zone"] = True
 
-        # even if not eligible directly, can be eligible via subdomains
-        elif eligible_children:
+        # Tally subdomains first, so we know if the parent zone is
+        # definitely eligible as a zone even if not as a website
+        eligible_children = {name for name in scan_data[domain_name].get("subdomains", [])}
+        if any(eligible_for_https(domains[name]) for name in eligible_children):
             https_parent["eligible_zone"] = True
 
         # If the parent zone is preloaded, make sure that each subdomain
