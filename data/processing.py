@@ -285,7 +285,8 @@ def map_subdomains(domains, owners):
             subdomains.append(domain)
             domains[domain].update({
                 "base_domain": parent,
-                "is_parent": parent not in domains, # If the owners was not scanned, let all subdomains become 'parents' so they are displayed
+                # If the owners was not scanned, let all subdomains become 'parents' so they are displayed
+                "is_parent": parent not in domains,
                 "organization_slug": owners[parent]["organization_slug"],
                 "organization_name_en": owners[parent]["organization_name_en"],
                 "organization_name_fr": owners[parent]["organization_name_fr"],
@@ -343,7 +344,7 @@ def process_https(domains, scan_data, acceptable_ciphers):
 
 def total_reports(domains, owners):
     for domain_name in (domain for domain in domains if domains[domain]["is_parent"]):
-        https_parent = domains[domain_name].get("https")
+        https_parent = domains[domain_name]["https"]
 
         subdomain_names = owners.get(domain_name, {}).get("subdomains", [])
         eligible_children = {
@@ -353,12 +354,11 @@ def total_reports(domains, owners):
         # Totals based on summing up eligible reports within this domain.
         totals = {}
 
-        if https_parent:
-            https_parent["eligible_zone"] |= True if eligible_children else False
+        https_parent["eligible_zone"] |= True if eligible_children else False
 
         # For HTTPS/HSTS, pshtt-eligible parent + subdomains.
         eligible_reports = [domains[name]["https"] for name in eligible_children]
-        if https_parent and https_parent["eligible"]:
+        if https_parent["eligible"]:
             eligible_reports = [https_parent] + eligible_reports
         totals["https"] = total_https_report(eligible_reports)
 
@@ -369,7 +369,7 @@ def total_reports(domains, owners):
             if domains[name].get("https")
             and domains[name]["https"].get("rc4") is not None
         ]
-        if https_parent and https_parent.get("rc4") is not None:
+        if https_parent.get("rc4") is not None:
             eligible_reports = [https_parent] + eligible_reports
         totals["crypto"] = total_crypto_report(eligible_reports)
 
