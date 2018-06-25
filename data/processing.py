@@ -681,7 +681,7 @@ def total_https_report(eligible):
         if report["enforces"] >= 2:
             total_report["enforces"] += 1
 
-        # Needs to be present with >= 1 year max-age for canonical endpoint,
+        # Needs to be present with >= 18 weeks max-age for canonical endpoint,
         # or preloaded via its parent zone.
         if report["hsts"] >= 2:
             total_report["hsts"] += 1
