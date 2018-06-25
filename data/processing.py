@@ -93,7 +93,7 @@ def run(date: typing.Optional[str], connection_string: str):
     sorted_organizations.sort()
 
     # Calculate high-level per-domain conclusions for each report.
-    # Overwrites `domain_map` in place
+    # Overwrites `results` in place
     process_https(
         results, scan_data, acceptable_ciphers
     )
@@ -197,15 +197,9 @@ def load_domain_data() -> typing.Tuple[typing.Set, typing.Dict]:
 
             if domain_name not in domain_map:
                 domain_map[domain_name] = {
-                    "domain": domain_name,
-                    "base_domain": domain_name,
                     "organization_name_en": organization_name_en,
                     "organization_name_fr": organization_name_fr,
                     "organization_slug": organization_slug,
-                    "sources": ["canada-gov"],
-                    "is_owner": True,
-                    "is_parent": False,
-                    "exclude": {},
                 }
 
     with open(SCAN_DOMAINS_CSV, newline="") as csvfile:
