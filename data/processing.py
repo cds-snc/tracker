@@ -52,7 +52,8 @@ def run(date: typing.Optional[str], connection_string: str):
     # Returns dicts of values ready for saving as Domain and Agency objects.
     #
     # Also returns gathered subdomains, which need more filtering to be useful.
-    domains, domain_map = load_domain_data()
+    domains, owners = load_domain_data()
+    results = {}
     acceptable_ciphers = load_compliance_data()
 
     # Read in domain-scan CSV data.
@@ -61,28 +62,18 @@ def run(date: typing.Optional[str], connection_string: str):
     # Capture manual exclusions and pull out some high-level data from pshtt.
     for domain_name in scan_data:
         # Pull out a few pshtt.csv fields as general domain-level metadata.
-        domain_data = scan_data.get(domain_name)
-        if not domain_data:
-            continue
+        domain_data = scan_data[domain_name]
 
         pshtt = domain_data.get("pshtt", None)
         if pshtt is None:
             # generally means scan was on different domains.csv, but
             # invalid domains can hit this.
             LOGGER.warning("[%s] No pshtt data for domain!", domain_name)
-
-            # Remove the domain from further consideration.
-            # Destructive, so have this done last.
-            del domain_map[domain_name]
-        elif domain_name in domain_map:
-            # LOGGER.info("[%s] Updating with pshtt metadata." % domain_name)
-            domain_map[domain_name]["live"] = boolean_for(pshtt["Live"])
-            domain_map[domain_name]["redirect"] = boolean_for(pshtt["Redirect"])
-            domain_map[domain_name]["canonical"] = pshtt["Canonical URL"]
         elif boolean_for(pshtt['Live']):
-            domain_map[domain_name] = {
+            results[domain_name] = {
                 "domain": domain_name,
-                "is_owner": False,
+                "is_owner": domain_name in owners,
+                "is_parent": domain_name in owners,
                 "sources": ["canada-gov"],
                 "live": True,
                 "redirect": boolean_for(pshtt["Redirect"]),
@@ -90,19 +81,25 @@ def run(date: typing.Optional[str], connection_string: str):
                 "exclude": {},
             }
 
-    map_subdomains(scan_data, domain_map)
-    organizations = extract_orgs(domain_map)
+    # Find the parent domain for all domains in the owner list, mutating results in place
+    map_subdomains(results, owners)
 
-    # Save what we've got to the database so far.
-    sorted_domains = list(domain_map.keys())
+    # Extract organizations actually used in the set of scanned domains, and their counts
+    organizations = extract_orgs(results)
+
+    sorted_domains = list(results.keys())
     sorted_domains.sort()
     sorted_organizations = list(organizations.keys())
     sorted_organizations.sort()
 
     # Calculate high-level per-domain conclusions for each report.
-    # Overwrites `domains` and `subdomains` in-place.
-    process_domains(
-        domain_map, scan_data, acceptable_ciphers
+    # Overwrites `domain_map` in place
+    process_https(
+        results, scan_data, acceptable_ciphers
+    )
+    # Totals scan data for parent domains
+    total_reports(
+        results, owners,
     )
 
     # Reset the database.
@@ -113,14 +110,14 @@ def run(date: typing.Optional[str], connection_string: str):
         connection.organizations.clear()
 
         # Calculate organization-level summaries. Updates `organizations` in-place.
-        update_organization_totals(organizations, domain_map)
+        update_organization_totals(organizations, results)
 
         # Calculate government-wide summaries.
-        report = full_report(domain_map)
+        report = full_report(results)
         report["report_date"] = date
 
         LOGGER.info("Creating all domains.")
-        connection.domains.create_all(domain_map[domain_name] for domain_name in sorted_domains)
+        connection.domains.create_all(results[domain_name] for domain_name in sorted_domains)
         LOGGER.info("Creating all organizations.")
         connection.organizations.create_all(
             organizations[organization_name] for organization_name in sorted_organizations
@@ -199,13 +196,6 @@ def load_domain_data() -> typing.Tuple[typing.Set, typing.Dict]:
             organization_slug = slugify.slugify(organization_name_en)
 
             if domain_name not in domain_map:
-                # By assuming the domain name is the base domain if it appears
-                # in current-federal.csv, we automatically treat fed.us domains
-                # as base domains, without explicitly incorporating the Public
-                # Suffix List.
-                #
-                # And since we excluded "fed.us" itself above, this should
-                # cover all the bases.
                 domain_map[domain_name] = {
                     "domain": domain_name,
                     "base_domain": domain_name,
@@ -214,6 +204,7 @@ def load_domain_data() -> typing.Tuple[typing.Set, typing.Dict]:
                     "organization_slug": organization_slug,
                     "sources": ["canada-gov"],
                     "is_owner": True,
+                    "is_parent": False,
                     "exclude": {},
                 }
 
@@ -225,24 +216,21 @@ def load_domain_data() -> typing.Tuple[typing.Set, typing.Dict]:
             domain = row[0].lower().strip()
             domains.add(domain)
 
-
     return domains, domain_map
 
 
-def extract_orgs(domain_map: typing.Dict) -> typing.Dict:
-    organization_map = {}
-    for doc in domain_map.values():
+def extract_orgs(domains: typing.Dict) -> typing.Dict:
+    organizations = {}
+    for doc in domains.values():
         slug = doc['organization_slug']
-        if slug in organization_map:
-            organization_map[slug]['total_domains'] += 1
-        else:
-            organization_map[slug] = {
-                "name_en": doc['organization_name_en'],
-                "name_fr": doc['organization_name_fr'],
-                "slug": slug,
-                "total_domains": 1,
-            }
-    return organization_map
+        organization = organizations.setdefault(slug, {
+            "name_en": doc['organization_name_en'],
+            "name_fr": doc['organization_name_fr'],
+            "slug": slug,
+            "total_domains": 0,
+        })
+        organization["total_domains"] += 1
+    return organizations
 
 # Load in data from the CSVs produced by domain-scan.
 # The 'domains' map is used to ignore any untracked domains.
@@ -278,20 +266,17 @@ def load_scan_data(domains: typing.Set[str]) -> typing.Dict:
     return parent_scan_data
 
 
-def map_subdomains(scan_data, domain_map):
-    for domain in scan_data:
-        if boolean_for(scan_data[domain]['pshtt']["Live"]):
-            continue
-
-        if not domain_map[domain]["is_owner"]:
+def map_subdomains(domains, owners):
+    for domain in domains:
+        if not domains[domain]["is_owner"]:
             parts = domain.split('.')
-            subdomain = domain
-            while parts and (subdomain not in domain_map or not domain_map[subdomain]["is_owner"]):
+            parent = domain
+            while parts and parent not in owners:
                 parts = parts[1:]
-                subdomain = '.'.join(parts)
+                parent = '.'.join(parts)
 
             if not parts:
-                domain_map[domain].update({
+                domains[domain].update({
                     "base_domain": domain,
                     "is_parent": True,
                     "organization_name_en": 'Government of Canada',
@@ -301,30 +286,33 @@ def map_subdomains(scan_data, domain_map):
                 continue
 
             parent = '.'.join(parts)
-            # If the owner was not scanned, store the subdomains
-            # and let all subdomains become parents
-            subdomains = scan_data.setdefault(parent, {'fake': True}).setdefault("subdomains", [])
+
+            subdomains = owners[parent].setdefault("subdomains", [])
             subdomains.append(domain)
-            domain_map[domain].update({
+            domains[domain].update({
                 "base_domain": parent,
-                "is_parent": scan_data.get('fake') is True,
-                "organization_slug": domain_map[parent]["organization_slug"],
-                "organization_name_en": domain_map[parent]["organization_name_en"],
-                "organization_name_fr": domain_map[parent]["organization_name_fr"],
+                "is_parent": parent not in domains, # If the owners was not scanned, let all subdomains become 'parents' so they are displayed
+                "organization_slug": owners[parent]["organization_slug"],
+                "organization_name_en": owners[parent]["organization_name_en"],
+                "organization_name_fr": owners[parent]["organization_name_fr"],
             })
         else:
-            domain_map[domain].update({
-                "is_parent": True
+            domains[domain].update({
+                "base_domain": domain,
+                "is_parent": True,
+                "organization_slug": owners[domain]["organization_slug"],
+                "organization_name_en": owners[domain]["organization_name_en"],
+                "organization_name_fr": owners[domain]["organization_name_fr"],
             })
 
 
 
 # Given the domain data loaded in from CSVs, draw conclusions,
 # and filter/transform data into form needed for display.
-def process_domains(domains, scan_data, acceptable_ciphers):
+def process_https(domains, scan_data, acceptable_ciphers):
     # For each domain, determine eligibility and, if eligible,
     # use the scan data to draw conclusions.
-    for domain_name in domains.keys():
+    for domain_name in domains:
 
         ### HTTPS
         #
@@ -337,9 +325,13 @@ def process_domains(domains, scan_data, acceptable_ciphers):
 
         # No matter what, put the preloaded state onto the parent,
         # since even an unused domain can always be preloaded.
-        parent_preloaded = preloaded_or_not(
-            scan_data[domains[domain_name]['base_domain']]["pshtt"]
-        ) if not domains[domain_name]["is_parent"] else 0
+        try:
+            parent_preloaded = preloaded_or_not(
+                scan_data[domains[domain_name]['base_domain']]["pshtt"]
+            ) if not domains[domain_name]["is_parent"] else 0
+        except KeyError:
+            # The parent domain wasn't in the list of domains to scan, assume it is not preloaded
+            parent_preloaded = 0
 
         if eligible_for_https(domains[domain_name]):
             https_parent = {
@@ -351,31 +343,32 @@ def process_domains(domains, scan_data, acceptable_ciphers):
                     parent_preloaded
                 )
             }
-
-        # Tally subdomains first, so we know if the parent zone is
-        # definitely eligible as a zone even if not as a website
-        eligible_children = {name for name in scan_data[domain_name].get("subdomains", [])}
-        if any(eligible_for_https(domains[name]) for name in eligible_children):
             https_parent["eligible_zone"] = True
-
-        # If the parent zone is preloaded, make sure that each subdomain
-        # is considered to have HSTS in place. If HSTS is yes on its own,
-        # leave it, but if not, then grant it the minimum level.
-        # TODO:
-
         domains[domain_name]["https"] = https_parent
+
+
+def total_reports(domains, owners):
+    for domain_name in (domain for domain in domains if domains[domain]["is_parent"]):
+        https_parent = domains[domain_name].get("https")
+
+        subdomain_names = owners.get(domain_name, {}).get("subdomains", [])
+        eligible_children = {
+            name for name in subdomain_names if eligible_for_https(domains[name])
+        }
 
         # Totals based on summing up eligible reports within this domain.
         totals = {}
 
+        if https_parent:
+            https_parent["eligible_zone"] |= True if eligible_children else False
+
         # For HTTPS/HSTS, pshtt-eligible parent + subdomains.
         eligible_reports = [domains[name]["https"] for name in eligible_children]
-        if https_parent["eligible"]:
+        if https_parent and https_parent["eligible"]:
             eligible_reports = [https_parent] + eligible_reports
         totals["https"] = total_https_report(eligible_reports)
 
         # For SSLv2/SSLv3/RC4/3DES, sslyze-eligible parent + subdomains.
-        subdomain_names = scan_data[domain_name].get("subdomains", [])
         eligible_reports = [
             domains[name]["https"]
             for name in subdomain_names
