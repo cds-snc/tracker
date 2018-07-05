@@ -33,10 +33,19 @@ jobs:
     working_directory: /home/DEV.T1.TBS-SCT.GC.CA/dsamojle-ps
     steps:
       - checkout
+      - restore_cache:
+          key: "deps1-{{ .Branch }}-{{ checksum \"deploy/provision.sh\" }}"
       - run:
-          command: |
-              sh deploy/provision.sh
-              sh deploy/build-env.sh
+          command: sh deploy/provision.sh
+          name: "Provisioning build environment"
+      - save_cache:
+          key: "deps1-{{ .Branch }}-{{ checksum \"deploy/provision.sh\" }}"
+          paths:
+            - /usr/local/bin/python3.6
+            - /usr/local/lib/python3.6
+      - run:
+          command: sh deploy/build-env.sh
+          name: "Building the package"
       - store_artifacts:
           path: /home/DEV.T1.TBS-SCT.GC.CA/dsamojle-ps/tracker.tar.gz
           destination: tracker.tar.gz
