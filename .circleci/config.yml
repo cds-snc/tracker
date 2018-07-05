@@ -57,6 +57,6 @@ workflows:
       - build_package:
          requires:
             - tracker
-#         filters:
-#           branches:
-#             only: master
+         filters:
+           branches:
+             only: master
