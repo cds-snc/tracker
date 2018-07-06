@@ -27,36 +27,8 @@ jobs:
               pytest --cov=data tests
           name: "Running tests"
     working_directory: ~/repo
-  build_package:
-    docker:
-      - image: ubuntu:xenial
-    working_directory: /home/DEV.T1.TBS-SCT.GC.CA/dsamojle-ps
-    steps:
-      - checkout
-      - restore_cache:
-          key: "deps1-{{ .Branch }}-{{ checksum \"deploy/provision.sh\" }}"
-      - run:
-          command: sh deploy/provision.sh
-          name: "Provisioning build environment"
-      - save_cache:
-          key: "deps1-{{ .Branch }}-{{ checksum \"deploy/provision.sh\" }}"
-          paths:
-            - /usr/local/bin/python3.6
-            - /usr/local/lib/python3.6
-      - run:
-          command: sh deploy/build-env.sh
-          name: "Building the package"
-      - store_artifacts:
-          path: /home/DEV.T1.TBS-SCT.GC.CA/dsamojle-ps/tracker.tar.gz
-          destination: tracker.tar.gz
 workflows:
   version: 2
   tracker:
     jobs:
       - tracker
-      - build_package:
-         requires:
-            - tracker
-         filters:
-           branches:
-             only: master
