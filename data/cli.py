@@ -115,7 +115,7 @@ def run(
 
     update.callback(scanner, domains, output, domain_scan_args)
     the_date = get_date(None, "date", date)
-    process.callback(the_date, ctx.obj.get("batch_size"))
+    process.callback(the_date)
 
 
 @main.command(help="Download the input data from the database for use in scanning")
