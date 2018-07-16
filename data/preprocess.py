@@ -40,7 +40,7 @@ def insert_data(
         ciphers: typing.Optional[typing.IO[str]],
         upsert: bool,
         connection: models.Connection,
-        batch_size: typing.Optional[int],
+        batch_size: typing.Optional[int] = None,
     ) -> None:
 
     insertions = []
