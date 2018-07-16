@@ -1,3 +1,5 @@
+import itertools
+from time import sleep
 import typing
 import pymongo
 from pymongo import UpdateOne
@@ -8,14 +10,72 @@ def _clear_collection(client: pymongo.MongoClient, name: str, database: typing.O
     client.get_database(database).get_collection('meta').delete_many({'_collection': name})
 
 
+class InsertionError(Exception):
+    def __init__(self, *args, errors, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.errors = errors
+
+
+def grouper(group_size, iterable):
+    iterator = iter(iterable)
+    while True:
+        chunk = tuple(itertools.islice(iterator, group_size))
+        if not chunk:
+            return
+        yield chunk
+
+
+def _retry_write_many(
+        documents: typing.Iterable[typing.Dict],
+        write_method: typing.Callable[[typing.Iterable[typing.Dict]], None],
+        times: int
+    ) -> None:
+    '''Attempt `collection`.insert_many(`documents`) `times` times'''
+
+    errors = []
+    for count in range(1, times+1): # Only do {times} attempts to insert
+        try:
+            write_method(documents)
+            break
+        except pymongo.errors.DuplicateKeyError as exc:
+            # After retrying the insertion, some of the documents were duplicates, this is OK
+            break
+        except pymongo.errors.BulkWriteError as exc:
+            details = exc.details.get('writeErrors', [])
+            # Check if all errors were duplicate key errors, if so this is OK
+            if not all(error['code'] == 11000 for error in details):
+                raise exc
+            break
+        except pymongo.errors.OperationFailure as exc:
+            # Check if we blew the request rate, if so take a break and try again
+            errors.append(exc)
+            if exc.code == 429:
+                sleep(count)
+            else:
+                raise
+    else:
+        # Loop exited normally, not via a break. This means that it failed each time
+        raise InsertionError("Unable to insert document, failed 5 times", errors=errors)
+    return
+
+
+
 def _insert_all(
         client: pymongo.MongoClient,
         collection: str,
         documents: typing.Iterable[typing.Dict],
-        database: typing.Optional[str] = None) -> None:
-    client.get_database(database)\
-          .get_collection('meta')\
-          .insert_many({'_collection': collection, **document} for document in documents)
+        database: typing.Optional[str] = None,
+        batch_size: typing.Optional[int] = None) -> None:
+    if not batch_size:
+        client.get_database(database)\
+              .get_collection('meta')\
+              .insert_many({'_collection': collection, **document} for document in documents)
+    else:
+        document_stream = grouper(batch_size, documents)
+        collect = client.get_database(database).get_collection('meta')
+        for chunk in document_stream:
+            documents = [{'_collection': collection, **document} for document in chunk]
+            _retry_write_many(documents, collect.insert_many, 5)
 
 
 def _insert(
@@ -31,7 +91,8 @@ def _upsert_all(
         collection: str,
         documents: typing.Iterable[typing.Dict],
         key_col: str = '_id',
-        database: typing.Optional[str] = None) -> None:
+        database: typing.Optional[str] = None,
+        batch_size: typing.Optional[int] = None) -> None:
 
     writes = [
         UpdateOne(
@@ -41,9 +102,16 @@ def _upsert_all(
         ) for document in documents
     ]
 
-    client.get_database(database)\
-          .get_collection('meta')\
-          .bulk_write(writes)
+    if batch_size:
+        client.get_database(database)\
+              .get_collection('meta')\
+              .bulk_write(writes)
+    else:
+        document_stream = grouper(batch_size, writes)
+        collect = client.get_database(database).get_collection('meta')
+        for chunk in document_stream:
+            writes = [write for write in chunk]
+            _retry_write_many(writes, collect.bulk_write, 5)
 
 
 def _find(
@@ -66,14 +134,18 @@ class _Collection():
         except pymongo.errors.ConfigurationError:
             self._db = 'track'
 
-    def create_all(self, documents: typing.Iterable[typing.Dict]) -> None:
-        _insert_all(self._client, self._name, documents, self._db)
+    def create_all(self, documents: typing.Iterable[typing.Dict], batch_size: typing.Optional[int] = None) -> None:
+        _insert_all(self._client, self._name, documents, self._db, batch_size)
 
     def create(self, document: typing.Dict) -> None:
         _insert(self._client, self._name, document, self._db)
 
-    def upsert_all(self, documents: typing.Iterable[typing.Dict], key_column: str) -> None:
-        _upsert_all(self._client, self._name, documents, key_column, self._db)
+    def upsert_all(self,
+                   documents: typing.Iterable[typing.Dict],
+                   key_column: str,
+                   batch_size: typing.Optional[int] = None
+                  ) -> None:
+        _upsert_all(self._client, self._name, documents, key_column, self._db, batch_size)
 
     def all(self) -> typing.Iterable[typing.Dict]:
         return _find(self._client, self._name, {}, self._db)

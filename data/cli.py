@@ -63,9 +63,16 @@ def transform_args(args: typing.List[str]) -> typing.Dict[str, typing.Union[str,
     envvar="TRACKER_MONGO_URI",
     help="Interact with the tracker scanning utility",
 )
+@click.option(
+    "--batch-size",
+    type=int,
+    default=100,
+    envvar="TRACKER_BATCH_SIZE",
+    help="Manually batch uploads into groups of batch-size",
+)
 @click.pass_context
-def main(ctx: click.core.Context, connection: str) -> None:
-    ctx.obj = {"connection_string": connection}
+def main(ctx: click.core.Context, connection: str, batch_size: typing.Optional[str]) -> None:
+    ctx.obj = {"connection_string": connection, "batch_size": batch_size}
 
 
 @main.command(
@@ -108,7 +115,7 @@ def run(
 
     update.callback(scanner, domains, output, domain_scan_args)
     the_date = get_date(None, "date", date)
-    process.callback(the_date)
+    process.callback(the_date, ctx.obj.get("batch_size"))
 
 
 @main.command(help="Download the input data from the database for use in scanning")
@@ -174,7 +181,7 @@ def process(ctx: click.core.Context, date: str) -> None:
         return
 
     LOGGER.info("[%s] Loading data into track-digital.", date)
-    processing.run(date, ctx.obj.get("connection_string"))
+    processing.run(date, ctx.obj.get("connection_string"), ctx.obj.get("batch_size"))
     LOGGER.info("[%s] Data now loaded into track-digital.", date)
 
 
@@ -206,7 +213,8 @@ def insert(
         domains: typing.IO[str],
         ciphers: typing.IO[str],
         upsert: bool,
+        batch_size: typing.Optional[int],
 ) -> None:
 
     with models.Connection(ctx.obj.get("connection_string")) as connection:
-        insert_data(owners, domains, ciphers, upsert, connection)
+        insert_data(owners, domains, ciphers, upsert, connection, ctx.obj.get("batch_size"))

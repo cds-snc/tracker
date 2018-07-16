@@ -45,7 +45,7 @@ MIN_HSTS_AGE = 31536000 # one year
 # All database operations are made in the run() method.
 #
 # This method blows away the database and rebuilds it from the given data.
-def run(date: typing.Optional[str], connection_string: str):
+def run(date: typing.Optional[str], connection_string: str, batch_size: typing.Optional[int] = None):
     if date is None:
         date = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d")
 
@@ -118,10 +118,10 @@ def run(date: typing.Optional[str], connection_string: str):
         report["report_date"] = date
 
         LOGGER.info("Creating all domains.")
-        connection.domains.create_all(results[domain_name] for domain_name in sorted_domains)
+        connection.domains.create_all((results[domain_name] for domain_name in sorted_domains), batch_size=batch_size)
         LOGGER.info("Creating all organizations.")
         connection.organizations.create_all(
-            organizations[organization_name] for organization_name in sorted_organizations
+            (organizations[organization_name] for organization_name in sorted_organizations), batch_size=batch_size
         )
 
         # Create top-level summaries.
