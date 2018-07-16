@@ -1,4 +1,5 @@
 import itertools
+from http import HTTPStatus
 from time import sleep
 import typing
 import pymongo
@@ -49,7 +50,7 @@ def _retry_write_many(
         except pymongo.errors.OperationFailure as exc:
             # Check if we blew the request rate, if so take a break and try again
             errors.append(exc)
-            if exc.code == 429:
+            if exc.code == HTTPStatus.TOO_MANY_REQUESTS:
                 sleep(count)
             else:
                 raise
