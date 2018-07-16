@@ -25,10 +25,10 @@ def grouper(group_size, iterable):
             return
         yield chunk
 
-
-def _retry_write_many(
-        documents: typing.Iterable[typing.Dict],
-        write_method: typing.Callable[[typing.Iterable[typing.Dict]], None],
+T = typing.TypeVar('T')
+def _retry_write(
+        data: T,
+        write_method: typing.Callable[[T], None],
         times: int
     ) -> None:
     '''Attempt `collection`.insert_many(`documents`) `times` times'''
@@ -36,7 +36,7 @@ def _retry_write_many(
     errors = []
     for count in range(1, times+1): # Only do {times} attempts to insert
         try:
-            write_method(documents)
+            write_method(data)
             break
         except pymongo.errors.DuplicateKeyError as exc:
             # After retrying the insertion, some of the documents were duplicates, this is OK
@@ -56,7 +56,7 @@ def _retry_write_many(
                 raise
     else:
         # Loop exited normally, not via a break. This means that it failed each time
-        raise InsertionError("Unable to insert document, failed 5 times", errors=errors)
+        raise InsertionError("Unable to insert document, failed %d times" % count, errors=errors)
     return
 
 
@@ -76,7 +76,7 @@ def _insert_all(
         collect = client.get_database(database).get_collection('meta')
         for chunk in document_stream:
             documents = [{'_collection': collection, **document} for document in chunk]
-            _retry_write_many(documents, collect.insert_many, 5)
+            _retry_write(documents, collect.insert_many, 5)
 
 
 def _insert(
@@ -112,7 +112,7 @@ def _upsert_all(
         collect = client.get_database(database).get_collection('meta')
         for chunk in document_stream:
             writes = [write for write in chunk]
-            _retry_write_many(writes, collect.bulk_write, 5)
+            _retry_write(writes, collect.bulk_write, 5)
 
 
 def _find(
