@@ -112,9 +112,9 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
     # Reset the database.
     LOGGER.info("Clearing the database.")
     with models.Connection(connection_string) as connection:
-        connection.domains.clear(batch_size=500)
-        connection.reports.clear(batch_size=500)
-        connection.organizations.clear(batch_size=500)
+        connection.domains.clear(batch_size=100)
+        connection.reports.clear(batch_size=100)
+        connection.organizations.clear(batch_size=100)
 
         # Calculate organization-level summaries. Updates `organizations` in-place.
         update_organization_totals(organizations, results)
