@@ -47,7 +47,7 @@ def _retry_write(
             details = exc.details.get('writeErrors', [])
             # Check if all errors were duplicate key errors, if so this is OK
             if not all(error['code'] == DUPLICATE_KEY_ERROR for error in details):
-                raise exc
+                raise
             break
         except pymongo.errors.OperationFailure as exc:
             # Check if we blew the request rate, if so take a break and try again
