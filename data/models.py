@@ -26,6 +26,8 @@ def grouper(group_size, iterable):
         yield chunk
 
 DATATYPE = typing.TypeVar('T')
+REQUEST_RATE_ERROR = 16500
+DUPLICATE_KEY_ERROR = 11000
 def _retry_write(
         data: DATATYPE,
         write_method: typing.Callable[[DATATYPE], None],
@@ -44,13 +46,13 @@ def _retry_write(
         except pymongo.errors.BulkWriteError as exc:
             details = exc.details.get('writeErrors', [])
             # Check if all errors were duplicate key errors, if so this is OK
-            if not all(error['code'] == 11000 for error in details):
+            if not all(error['code'] == DUPLICATE_KEY_ERROR for error in details):
                 raise exc
             break
         except pymongo.errors.OperationFailure as exc:
             # Check if we blew the request rate, if so take a break and try again
             errors.append(exc)
-            if exc.code == HTTPStatus.TOO_MANY_REQUESTS:
+            if exc.code == REQUEST_RATE_ERROR:
                 sleep(count)
             else:
                 raise
