@@ -1,14 +1,9 @@
 import itertools
-from http import HTTPStatus
+import logging
 from time import sleep
 import typing
 import pymongo
 from pymongo import UpdateOne
-
-
-# Data loads should clear the entire database first.
-def _clear_collection(client: pymongo.MongoClient, name: str, database: typing.Optional[str] = None):
-    client.get_database(database).get_collection('meta').delete_many({'_collection': name})
 
 
 class InsertionError(Exception):
@@ -25,12 +20,15 @@ def grouper(group_size, iterable):
             return
         yield chunk
 
+
+LOGGER = logging.getLogger(__name__)
+MAX_TRIES = 5
+
 T = typing.TypeVar('T')
 def _retry_write(
         data: T,
         write_method: typing.Callable[[T], None],
-        times: int
-    ) -> None:
+        times: int) -> None:
     '''Attempt `collection`.insert_many(`documents`) `times` times'''
 
     errors = []
@@ -50,7 +48,8 @@ def _retry_write(
         except pymongo.errors.OperationFailure as exc:
             # Check if we blew the request rate, if so take a break and try again
             errors.append(exc)
-            if exc.code == HTTPStatus.TOO_MANY_REQUESTS:
+            if exc.code == 16500:
+                LOGGER.warning('Exceeded RU limit, pausing for %d seconds...', count)
                 sleep(count)
             else:
                 raise
@@ -59,6 +58,23 @@ def _retry_write(
         raise InsertionError("Unable to insert document, failed %d times" % count, errors=errors)
     return
 
+
+# Data loads clear the entire database first.
+def _clear_collection(
+        client: pymongo.MongoClient,
+        name: str,
+        database: typing.Optional[str] = None,
+        batch_size: typing.Optional[int] = None) -> None:
+    if not batch_size:
+        client.get_database(database).get_collection('meta').delete_many()
+    else:
+        # Chunk the delete requests into batches
+        collection = client.get_database(database).get_collection('meta')
+
+        cursor = collection.find({'_collection': name}, {"_id": True})
+        queries = ({"_id": {"$in": chunk}} for chunk in grouper(batch_size, cursor))
+        for query in queries:
+            _retry_write(query, collection.delete_many, MAX_TRIES)
 
 
 def _insert_all(
@@ -76,7 +92,7 @@ def _insert_all(
         collect = client.get_database(database).get_collection('meta')
         for chunk in document_stream:
             documents = [{'_collection': collection, **document} for document in chunk]
-            _retry_write(documents, collect.insert_many, 5)
+            _retry_write(documents, collect.insert_many, MAX_TRIES)
 
 
 def _insert(
@@ -112,7 +128,7 @@ def _upsert_all(
         collect = client.get_database(database).get_collection('meta')
         for chunk in document_stream:
             writes = [write for write in chunk]
-            _retry_write(writes, collect.bulk_write, 5)
+            _retry_write(writes, collect.bulk_write, MAX_TRIES)
 
 
 def _find(
@@ -151,8 +167,8 @@ class _Collection():
     def all(self) -> typing.Iterable[typing.Dict]:
         return _find(self._client, self._name, {}, self._db)
 
-    def clear(self) -> None:
-        _clear_collection(self._client, self._name, self._db)
+    def clear(self, batch_size: typing.Optional[int] = None) -> None:
+        _clear_collection(self._client, self._name, self._db, batch_size)
 
 
 class Connection():
