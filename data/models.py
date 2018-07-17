@@ -1,5 +1,4 @@
 import itertools
-from http import HTTPStatus
 from time import sleep
 import typing
 import pymongo
