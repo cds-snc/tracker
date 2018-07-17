@@ -58,7 +58,7 @@ def _retry_write(
                 raise
     else:
         # Loop exited normally, not via a break. This means that it failed each time
-        raise InsertionError("Unable to insert document, failed %d times" % count, errors=errors)
+        raise InsertionError("Unable to execute request, failed %d times" % count, errors=errors)
 
 # Data loads clear the entire database first.
 def _clear_collection(
@@ -69,11 +69,16 @@ def _clear_collection(
     if not batch_size:
         client.get_database(database).get_collection('meta').delete_many({'_collection': name})
     else:
-        # Chunk the delete requests into batches
         collection = client.get_database(database).get_collection('meta')
 
         cursor = collection.find({'_collection': name}, {"_id": True})
-        queries = ({"_id": {"$in": [doc["_id"] for doc in chunk]}} for chunk in grouper(batch_size, cursor))
+        queries = (
+            {"_id": {
+                "$in": [
+                    doc["_id"] for doc in chunk
+                ]
+            }} for chunk in grouper(batch_size, cursor)
+        )
         for query in queries:
             _retry_write(query, collection.delete_many, MAX_TRIES)
 
