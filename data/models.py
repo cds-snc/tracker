@@ -67,13 +67,13 @@ def _clear_collection(
         database: typing.Optional[str] = None,
         batch_size: typing.Optional[int] = None) -> None:
     if not batch_size:
-        client.get_database(database).get_collection('meta').delete_many()
+        client.get_database(database).get_collection('meta').delete_many({'_collection': name})
     else:
         # Chunk the delete requests into batches
         collection = client.get_database(database).get_collection('meta')
 
         cursor = collection.find({'_collection': name}, {"_id": True})
-        queries = ({"_id": {"$in": chunk}} for chunk in grouper(batch_size, cursor))
+        queries = ({"_id": {"$in": [doc["_id"] for doc in chunk]}} for chunk in grouper(batch_size, cursor))
         for query in queries:
             _retry_write(query, collection.delete_many, MAX_TRIES)
 
