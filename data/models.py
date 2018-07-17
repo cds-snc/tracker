@@ -120,7 +120,7 @@ def _upsert_all(
         ) for document in documents
     ]
 
-    if batch_size:
+    if not batch_size:
         client.get_database(database)\
               .get_collection('meta')\
               .bulk_write(writes)
