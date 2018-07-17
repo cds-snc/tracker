@@ -213,7 +213,6 @@ def insert(
         domains: typing.IO[str],
         ciphers: typing.IO[str],
         upsert: bool,
-        batch_size: typing.Optional[int],
 ) -> None:
 
     with models.Connection(ctx.obj.get("connection_string")) as connection:

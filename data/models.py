@@ -25,13 +25,13 @@ def grouper(group_size, iterable):
             return
         yield chunk
 
-T = typing.TypeVar('T')
+DATATYPE = typing.TypeVar('T')
 def _retry_write(
-        data: T,
-        write_method: typing.Callable[[T], None],
+        data: DATATYPE,
+        write_method: typing.Callable[[DATATYPE], None],
         times: int
     ) -> None:
-    '''Attempt `collection`.insert_many(`documents`) `times` times'''
+    '''Attempt `write_method`(`data`) `times` times'''
 
     errors = []
     for count in range(1, times+1): # Only do {times} attempts to insert
@@ -57,8 +57,6 @@ def _retry_write(
     else:
         # Loop exited normally, not via a break. This means that it failed each time
         raise InsertionError("Unable to insert document, failed %d times" % count, errors=errors)
-    return
-
 
 
 def _insert_all(
