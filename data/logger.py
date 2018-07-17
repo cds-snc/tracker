@@ -19,6 +19,8 @@ _stream_handler.setFormatter(_formatter)
 logging.getLogger().addHandler(_syslog_handler)
 logging.getLogger().addHandler(_stream_handler)
 
+# https://codereview.stackexchange.com/questions/6567/redirecting-subprocesses-output-stdout-and-stderr-to-the-logging-module
+# To redirect stderr & stdout from subprocess calls into a logger
 class LogPipe(threading.Thread):
 
     def __init__(self, logger, level):
