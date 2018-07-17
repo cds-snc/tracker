@@ -24,12 +24,15 @@ def grouper(group_size, iterable):
 LOGGER = logging.getLogger(__name__)
 MAX_TRIES = 5
 
-T = typing.TypeVar('T')
+DATATYPE = typing.TypeVar('DATATYPE')
+REQUEST_RATE_ERROR = 16500
+DUPLICATE_KEY_ERROR = 11000
 def _retry_write(
-        data: T,
-        write_method: typing.Callable[[T], None],
-        times: int) -> None:
-    '''Attempt `collection`.insert_many(`documents`) `times` times'''
+        data: DATATYPE,
+        write_method: typing.Callable[[DATATYPE], None],
+        times: int
+    ) -> None:
+    '''Attempt `write_method`(`data`) `times` times'''
 
     errors = []
     for count in range(1, times+1): # Only do {times} attempts to insert
@@ -42,13 +45,13 @@ def _retry_write(
         except pymongo.errors.BulkWriteError as exc:
             details = exc.details.get('writeErrors', [])
             # Check if all errors were duplicate key errors, if so this is OK
-            if not all(error['code'] == 11000 for error in details):
-                raise exc
+            if not all(error['code'] == DUPLICATE_KEY_ERROR for error in details):
+                raise
             break
         except pymongo.errors.OperationFailure as exc:
             # Check if we blew the request rate, if so take a break and try again
             errors.append(exc)
-            if exc.code == 16500:
+            if exc.code == REQUEST_RATE_ERROR:
                 LOGGER.warning('Exceeded RU limit, pausing for %d seconds...', count)
                 sleep(count)
             else:
@@ -56,8 +59,6 @@ def _retry_write(
     else:
         # Loop exited normally, not via a break. This means that it failed each time
         raise InsertionError("Unable to insert document, failed %d times" % count, errors=errors)
-    return
-
 
 # Data loads clear the entire database first.
 def _clear_collection(
