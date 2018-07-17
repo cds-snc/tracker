@@ -10,12 +10,15 @@ _syslog_handler.setLevel(logging.ERROR)
 _stream_handler = logging.StreamHandler()
 _stream_handler.setLevel(logging.INFO)
 
-_formatter = logging.Formatter(
+_stream_formatter = logging.Formatter(
     fmt="%(asctime)s - %(levelname)s - %(name)s: %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%S%z",
 )
-_syslog_handler.setFormatter(_formatter)
-_stream_handler.setFormatter(_formatter)
+_syslog_formatter = logging.Formatter(
+    fmt="%(name)s: [%(levelname)s] %(message)s",
+)
+_syslog_handler.setFormatter(_syslog_formatter)
+_stream_handler.setFormatter(_stream_formatter)
 logging.getLogger().addHandler(_syslog_handler)
 logging.getLogger().addHandler(_stream_handler)
 
