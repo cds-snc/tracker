@@ -6,10 +6,16 @@ import pymongo
 from pymongo import UpdateOne
 
 
-class InsertionError(Exception):
+class TrackerModelError(Exception):
+    pass
+
+class InsertionError(TrackerModelError):
     def __init__(self, *args, errors, **kwargs):
         super().__init__(*args, **kwargs)
         self.errors = errors
+
+class DeleteError(TrackerModelError):
+    pass
 
 
 def grouper(group_size, iterable):
@@ -24,12 +30,58 @@ def grouper(group_size, iterable):
 LOGGER = logging.getLogger(__name__)
 MAX_TRIES = 5
 
-DATATYPE = typing.TypeVar('DATATYPE')
 REQUEST_RATE_ERROR = 16500
 DUPLICATE_KEY_ERROR = 11000
+DELETE_REFUSED = 2
+
+def _retry_delete_in(
+        objects: typing.Sequence,
+        method: typing.Callable[[dict], None],
+        times: int,
+    ) -> None:
+
+    query = {
+        "_id": {
+            "$in": objects
+        }
+    }
+
+    for count in range(1, times+1):
+        try:
+            method(query)
+            break
+        except pymongo.errors.OperationFailure as exc:
+            if exc.code == DELETE_REFUSED:
+                # Request was too big, it's not going to do it.
+                length = len(objects)
+                if length == 1:
+                    # We tried cutting up the data until it was a single write request, and that still failed
+                    # time to pack it in
+                    import pdb; pdb.set_trace()
+                    raise
+
+                LOGGER.warning('Request refused, trying with half the previous request')
+
+                iter_data = iter(objects)
+                first_half = list(itertools.islice(iter_data, length//2))
+                second_half = list(iter_data)
+                _retry_delete_in(first_half, method, times)
+                _retry_delete_in(second_half, method, times)
+            else:
+                import pdb; pdb.set_trace()
+                raise
+        except Exception as exc:
+            import pdb; pdb.set_trace()
+            raise
+    else:
+        # Loop exited normally, not via a break. This means that it failed each time
+        import pdb; pdb.set_trace()
+        raise DeleteError("Unable to execute request, failed %d times" % count)
+
+
 def _retry_write(
-        data: DATATYPE,
-        write_method: typing.Callable[[DATATYPE], None],
+        data: typing.Sequence[dict],
+        write_method: typing.Callable[[typing.Iterable[dict]], None],
         times: int
     ) -> None:
     '''Attempt `write_method`(`data`) `times` times'''
@@ -46,6 +98,7 @@ def _retry_write(
             details = exc.details.get('writeErrors', [])
             # Check if all errors were duplicate key errors, if so this is OK
             if not all(error['code'] == DUPLICATE_KEY_ERROR for error in details):
+                import pdb; pdb.set_trace()
                 raise
             break
         except pymongo.errors.OperationFailure as exc:
@@ -55,9 +108,14 @@ def _retry_write(
                 LOGGER.warning('Exceeded RU limit, pausing for %d seconds...', count)
                 sleep(count)
             else:
+                import pdb; pdb.set_trace()
                 raise
+        except Exception as exc:
+            import pdb; pdb.set_trace()
+            raise
     else:
         # Loop exited normally, not via a break. This means that it failed each time
+        import pdb; pdb.set_trace()
         raise InsertionError("Unable to execute request, failed %d times" % count, errors=errors)
 
 # Data loads clear the entire database first.
@@ -71,16 +129,15 @@ def _clear_collection(
     else:
         collection = client.get_database(database).get_collection('meta')
 
+        # In order to chunk up a delete request, we need to first do a find
+        # for the documents we want to delete
         cursor = collection.find({'_collection': name}, {"_id": True})
-        queries = (
-            {"_id": {
-                "$in": [
-                    doc["_id"] for doc in chunk
-                ]
-            }} for chunk in grouper(batch_size, cursor)
+        chunks = (
+            [doc["_id"] for doc in chunk]
+            for chunk in grouper(batch_size, cursor)
         )
-        for query in queries:
-            _retry_write(query, collection.delete_many, MAX_TRIES)
+        for object_ids in chunks:
+            _retry_delete_in(object_ids, collection.delete_many, MAX_TRIES)
 
 
 def _insert_all(
@@ -117,13 +174,13 @@ def _upsert_all(
         database: typing.Optional[str] = None,
         batch_size: typing.Optional[int] = None) -> None:
 
-    writes = [
+    writes = (
         UpdateOne(
             {'_collection': collection, key_col: document.get(key_col)},
             {'$set': {'_collection': collection, **document}},
             upsert=True,
         ) for document in documents
-    ]
+    )
 
     if not batch_size:
         client.get_database(database)\
