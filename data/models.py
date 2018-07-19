@@ -69,6 +69,7 @@ def _retry_delete_in(
             else:
                 raise
         except Exception as exc:
+            LOGGER.exception('Unknown error in delete retry loop')
             raise
     else:
         # Loop exited normally, not via a break. This means that it failed each time
@@ -105,6 +106,7 @@ def _retry_write(
             else:
                 raise
         except Exception as exc:
+            LOGGER.exception('Unknown error in delete retry loop')
             raise
     else:
         # Loop exited normally, not via a break. This means that it failed each time
