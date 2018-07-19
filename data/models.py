@@ -57,7 +57,6 @@ def _retry_delete_in(
                 if length == 1:
                     # We tried cutting up the data until it was a single write request, and that still failed
                     # time to pack it in
-                    import pdb; pdb.set_trace()
                     raise
 
                 LOGGER.warning('Request refused, trying with half the previous request')
@@ -68,14 +67,11 @@ def _retry_delete_in(
                 _retry_delete_in(first_half, method, times)
                 _retry_delete_in(second_half, method, times)
             else:
-                import pdb; pdb.set_trace()
                 raise
         except Exception as exc:
-            import pdb; pdb.set_trace()
             raise
     else:
         # Loop exited normally, not via a break. This means that it failed each time
-        import pdb; pdb.set_trace()
         raise DeleteError("Unable to execute request, failed %d times" % count)
 
 
@@ -98,7 +94,6 @@ def _retry_write(
             details = exc.details.get('writeErrors', [])
             # Check if all errors were duplicate key errors, if so this is OK
             if not all(error['code'] == DUPLICATE_KEY_ERROR for error in details):
-                import pdb; pdb.set_trace()
                 raise
             break
         except pymongo.errors.OperationFailure as exc:
@@ -108,14 +103,11 @@ def _retry_write(
                 LOGGER.warning('Exceeded RU limit, pausing for %d seconds...', count)
                 sleep(count)
             else:
-                import pdb; pdb.set_trace()
                 raise
         except Exception as exc:
-            import pdb; pdb.set_trace()
             raise
     else:
         # Loop exited normally, not via a break. This means that it failed each time
-        import pdb; pdb.set_trace()
         raise InsertionError("Unable to execute request, failed %d times" % count, errors=errors)
 
 # Data loads clear the entire database first.
