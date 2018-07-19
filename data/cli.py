@@ -68,7 +68,7 @@ def transform_args(args: typing.List[str]) -> typing.Dict[str, typing.Union[str,
     type=int,
     default=100,
     envvar="TRACKER_BATCH_SIZE",
-    help="Manually batch uploads into groups of batch-size",
+    help="Manually batch uploads into groups of batch-size, enter 0 for no batching",
 )
 @click.pass_context
 def main(ctx: click.core.Context, connection: str, batch_size: typing.Optional[str]) -> None:
