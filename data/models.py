@@ -54,7 +54,7 @@ def _replace(
 
     client.get_database(database)\
           .get_collection('meta')\
-          .replace_one({"_collection": collection, **query}, document)
+          .replace_one({"_collection": collection, **query}, {"_collection": collection, **document})
 
 def _find(
         client: pymongo.MongoClient,
