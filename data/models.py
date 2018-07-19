@@ -141,7 +141,7 @@ def _insert_all(
     if not batch_size:
         client.get_database(database)\
               .get_collection('meta')\
-              .insert_many({'_collection': collection, **document} for document in documents)
+              .insert_many([{'_collection': collection, **document} for document in documents])
     else:
         document_stream = grouper(batch_size, documents)
         collect = client.get_database(database).get_collection('meta')
@@ -177,13 +177,13 @@ def _upsert_all(
     if not batch_size:
         client.get_database(database)\
               .get_collection('meta')\
-              .bulk_write(writes)
+              .bulk_write(list(writes))
     else:
         document_stream = grouper(batch_size, writes)
         collect = client.get_database(database).get_collection('meta')
         for chunk in document_stream:
-            writes = [write for write in chunk]
-            _retry_write(writes, collect.bulk_write, MAX_TRIES)
+            to_write = [write for write in chunk]
+            _retry_write(to_write, collect.bulk_write, MAX_TRIES)
 
 
 def _find(
