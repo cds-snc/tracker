@@ -52,9 +52,9 @@ def _replace(
         document: typing.Dict,
         database: typing.Optional[str] = None) -> None:
 
-    client.get_database(database)
-          .get_collection('meta')
-          .replace_one(({"_collection": collection, **query}, document)
+    client.get_database(database)\
+          .get_collection('meta')\
+          .replace_one({"_collection": collection, **query}, document)
 
 def _find(
         client: pymongo.MongoClient,
