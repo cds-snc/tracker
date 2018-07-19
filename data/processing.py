@@ -113,7 +113,6 @@ def run(date: typing.Optional[str], connection_string: str):
     LOGGER.info("Clearing the database.")
     with models.Connection(connection_string) as connection:
         connection.domains.clear()
-        connection.reports.clear()
         connection.organizations.clear()
 
         # Calculate organization-level summaries. Updates `organizations` in-place.
@@ -132,7 +131,10 @@ def run(date: typing.Optional[str], connection_string: str):
 
         # Create top-level summaries.
         LOGGER.info("Creating government-wide totals.")
-        connection.reports.create(report)
+        connection.reports.replace({}, report)
+
+        # Flag that the cache is now invalid
+        connection.flags.replace({}, {"cache": False})
 
     # Print and exit
     print_report(report)
