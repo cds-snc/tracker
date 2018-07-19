@@ -185,6 +185,16 @@ def _upsert_all(
             to_write = [write for write in chunk]
             _retry_write(to_write, collect.bulk_write, MAX_TRIES)
 
+def _replace(
+        client: pymongo.MongoClient,
+        collection: str,
+        query: typing.Dict,
+        document: typing.Dict,
+        database: typing.Optional[str] = None) -> None:
+
+    client.get_database(database)\
+          .get_collection('meta')\
+          .replace_one({"_collection": collection, **query}, {"_collection": collection, **document})
 
 def _find(
         client: pymongo.MongoClient,
@@ -218,6 +228,10 @@ class _Collection():
                    batch_size: typing.Optional[int] = None
                   ) -> None:
         _upsert_all(self._client, self._name, documents, key_column, self._db, batch_size)
+
+    def replace(self, query: typing.Dict, document: typing.Dict) -> None:
+        _replace(self._client, self._name, query, document, self._db)
+
 
     def all(self) -> typing.Iterable[typing.Dict]:
         return _find(self._client, self._name, {}, self._db)
@@ -260,6 +274,10 @@ class Connection():
     @property
     def ciphers(self) -> _Collection:
         return _Collection(self._client, 'ciphers')
+
+    @property
+    def flags(self) -> _Collection:
+        return _Collection(self._client, 'flags')
 
     def close(self) -> None:
         self._client.close()
