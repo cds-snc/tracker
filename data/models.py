@@ -48,8 +48,12 @@ def _retry_write(
             break
         except pymongo.errors.BulkWriteError as exc:
             details = exc.details.get('writeErrors', [])
-            # Check if all errors were duplicate key errors, if so this is OK
-            if not all(error['code'] == DUPLICATE_KEY_ERROR for error in details):
+            if all(error['code'] == REQUEST_RATE_ERROR for error in details):
+                LOGGER.warning('Exceeded RU limit, pausing for %d seconds...', count)
+                sleep(count)
+                continue
+            # Check if all errors were duplicate key errors, if so should be OK
+            elif not all(error['code'] == DUPLICATE_KEY_ERROR for error in details):
                 raise
             break
         except pymongo.errors.OperationFailure as exc:
