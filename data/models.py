@@ -50,7 +50,7 @@ def _retry_write(
         except pymongo.errors.BulkWriteError as exc:
             details = exc.details.get('writeErrors', [])
             if any(error['code'] == REQUEST_RATE_ERROR for error in details):
-                LOGGER.warning('Exceeded RU limit, pausing for %d seconds...', count)
+                LOGGER.warning('Exceeded RU limit, pausing for %d seconds...', 2*count)
                 sleep(2*count)
                 continue
             # Check if all errors were duplicate key errors, if so should be OK
@@ -61,7 +61,7 @@ def _retry_write(
             # Check if we blew the request rate, if so take a break and try again
             errors.append(exc)
             if exc.code == REQUEST_RATE_ERROR:
-                LOGGER.warning('Exceeded RU limit, pausing for %d seconds...', count)
+                LOGGER.warning('Exceeded RU limit, pausing for %d seconds...', 2*count)
                 sleep(2*count)
             else:
                 raise
