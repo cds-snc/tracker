@@ -92,8 +92,7 @@ def _clear_collection(
         database: typing.Optional[str] = None,
         batch_size: typing.Optional[int] = None) -> None:
     if not batch_size:
-        _retry_write({'_collection': name}, client.get_database(database).get_collection('meta').delete_many, 0)
-        # client.get_database(database).get_collection('meta').delete_many({'_collection': name})
+        _retry_write({'_collection': name}, client.get_database(database).get_collection('meta').delete_many, MAX_TRIES)
     else:
         collection = client.get_database(database).get_collection('meta')
 
@@ -117,9 +116,11 @@ def _insert_all(
         database: typing.Optional[str] = None,
         batch_size: typing.Optional[int] = None) -> None:
     if not batch_size:
-        client.get_database(database)\
-              .get_collection('meta')\
-              .insert_many([{'_collection': collection, **document} for document in documents])
+        _retry_write(
+            [{'_collection': collection, **document} for document in documents],
+            client.get_database(database).get_collection('meta').insert_many,
+            MAX_TRIES
+        )
     else:
         document_stream = grouper(batch_size, documents)
         collect = client.get_database(database).get_collection('meta')
@@ -154,9 +155,7 @@ def _upsert_all(
     )
 
     if not batch_size:
-        client.get_database(database)\
-              .get_collection('meta')\
-              .bulk_write(list(writes))
+        _retry_write(list(writes), client.get_database(database).get_collection('meta').bulk_write, MAX_TRIES)
     else:
         document_stream = grouper(batch_size, writes)
         collect = client.get_database(database).get_collection('meta')
