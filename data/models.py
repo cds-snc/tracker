@@ -1,6 +1,7 @@
 import functools
 import itertools
 import logging
+import os
 from time import sleep
 import typing
 import pymongo
@@ -26,7 +27,7 @@ def grouper(group_size, iterable):
         yield chunk
 
 
-MAX_TRIES = 5
+MAX_TRIES = int(os.environ.get("TRACKER_MAX_RETRIES", 0))
 
 REQUEST_RATE_ERROR = 16500
 DUPLICATE_KEY_ERROR = 11000
@@ -53,7 +54,10 @@ def _retry_write(
             # After retrying the insertion, some of the documents were duplicates, this is OK
             break
         except pymongo.errors.BulkWriteError as exc:
-            if sum(exc.details.get(field, 0) for field in ['nInserted', 'nUpserted', 'nMatched', 'nModified', 'nRemoved']) == 0 and not times:
+            if sum(
+                    exc.details.get(field, 0)
+                    for field in ['nInserted', 'nUpserted', 'nMatched', 'nModified', 'nRemoved']
+            ) == 0 and not times:
                 # If no work is being done, and we're not doing a fixed number of attempts, halt
                 raise
 
