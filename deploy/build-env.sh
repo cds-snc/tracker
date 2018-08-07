@@ -23,4 +23,4 @@ pip install --upgrade pip
 pip install azure-cli
 
 tar -czvf tracker.tar.gz .venv .azure_venv domain-scan
-rm -rf .venv domain-scan
+rm -rf .venv .azure_venv domain-scan
