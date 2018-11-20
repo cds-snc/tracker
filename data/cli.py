@@ -1,9 +1,15 @@
 from itertools import zip_longest
+
 import os
 import typing
 import datetime
 import click
+
+from azure.keyvault import KeyVaultClient
+from msrestazure.azure_active_directory import MSIAuthentication
+
 import ujson
+
 from data import env
 from data.env import DATA_DIR
 from data import update as data_update
@@ -12,18 +18,17 @@ from data import logger
 from data import models
 from data.preprocess import pull_data, insert_data
 
-from azure.keyvault import KeyVaultClient
-from msrestazure.azure_active_directory import MSIAuthentication, ServicePrincipalCredentials
+
 
 LOGGER = logger.get_logger(__name__)
 
 # init Azure MSI & KeyVault creds
 
-if os.environ.get("TRACKER_KEYVAULT_URI", None) != None:
-    creds = MSIAuthentication(resource='https://vault.azure.net')
-    keyvault = KeyVaultClient(creds)
+if os.environ.get("TRACKER_KEYVAULT_URI", None) is not None:
+    CREDS = MSIAuthentication(resource='https://vault.azure.net')
+    KV_CLIENT = KeyVaultClient(CREDS)
     KV_URI = os.environ.get("TRACKER_KEYVAULT_URI")
-    MONGO_URI = keyvault.get_secret(KV_URI, "cosmosdb-rw-conn-string", "").value
+    MONGO_URI = KV_CLIENT.get_secret(KV_URI, "cosmosdb-rw-conn-string", "").value
 else:
     MONGO_URI = os.environ.get("TRACKER_MONGO_URI", "mongodb://localhost:27017/track")
 
