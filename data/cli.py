@@ -24,11 +24,12 @@ LOGGER = logger.get_logger(__name__)
 
 # init Azure MSI & KeyVault creds
 
-if os.environ.get("TRACKER_KEYVAULT_URI", None) is not None:
+if os.environ.get("TRACKER_KEYVAULT_URI", None) is not None and os.environ.get("SECRET_NAME_RW", None) is not None:
+    KV_URI = os.environ.get("TRACKER_KEYVAULT_URI")
+    SECRET_NAME=os.environ.get("SECRET_NAME_RW")
     CREDS = MSIAuthentication(resource='https://vault.azure.net')
     KV_CLIENT = KeyVaultClient(CREDS)
-    KV_URI = os.environ.get("TRACKER_KEYVAULT_URI")
-    MONGO_URI = KV_CLIENT.get_secret(KV_URI, "cosmosdb-rw-conn-string", "").value
+    MONGO_URI = KV_CLIENT.get_secret(KV_URI, SECRET_NAME, "").value
 else:
     MONGO_URI = os.environ.get("TRACKER_MONGO_URI", "mongodb://localhost:27017/track")
 
