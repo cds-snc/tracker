@@ -26,7 +26,7 @@ LOGGER = logger.get_logger(__name__)
 
 if os.environ.get("TRACKER_KEYVAULT_URI", None) is not None and os.environ.get("SECRET_NAME_RW", None) is not None:
     KV_URI = os.environ.get("TRACKER_KEYVAULT_URI")
-    SECRET_NAME=os.environ.get("SECRET_NAME_RW")
+    SECRET_NAME = os.environ.get("SECRET_NAME_RW")
     CREDS = MSIAuthentication(resource='https://vault.azure.net')
     KV_CLIENT = KeyVaultClient(CREDS)
     MONGO_URI = KV_CLIENT.get_secret(KV_URI, SECRET_NAME, "").value
