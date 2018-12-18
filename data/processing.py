@@ -196,6 +196,9 @@ def load_domain_data() -> typing.Tuple[typing.Set, typing.Dict]:
 
     with owner_path.open('r', encoding='utf-8-sig', newline='') as csvfile:
         for row in csv.reader(csvfile):
+            if row == []: # deal with trailing newlines..
+                LOGGER.warning("Trailing newline detected in %s.", owner_path)
+                continue
             if row[0].lower().startswith("domain"):
                 continue
 
