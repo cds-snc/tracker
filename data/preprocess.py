@@ -109,12 +109,16 @@ def update_data(
         new_owners_set = []
         for record in new_owners:
             temp = []
-            for key, value in record.items():
+            for _, value in record.items():
                 temp.append(value)
             new_owners_set.append(tuple(temp))
 
         # Get the remote list of owners
-        remote_owners = [(document['domain'], document['organization_en'], document['organization_fr']) for document in connection.owners.all()]
+        remote_owners = [
+            (document['domain'],
+             document['organization_en'],
+             document['organization_fr'])
+            for document in connection.owners.all()]
 
         # additions : new list - old list
         # removals : old list - new list
@@ -125,18 +129,23 @@ def update_data(
 
         # find matching removals (modifications)
         mods = []
-        for x in owner_removals:
-            srch = x[0] # this is the domain
-            for y in owner_additions:
-                if srch == y[0]:
+        for removal in owner_removals:
+            srch = removal[0] # this is the domain
+            for addition in owner_additions:
+                if srch == addition[0]:
                     # matching domain, we call this a modification
-                    mods.append([y, x])
+                    mods.append([addition, removal])
 
-        # we'll want to zip through the modifications records, with the old domains, query into the domains table, then replace with the new records.
+        # we'll want to zip through the modifications records, with the old domains,
+        # query into the domains table, then replace with the new records.
         for record in mods:
             oldorg_en = record[1][1] # old record, (domain, *english, french)
             oldorg_fr = record[1][2] # same as above, mais en francais
-            for doc in connection.domains.find_with_id({"domain": record[1][0], "organization_name_en":oldorg_en, "organization_name_fr":oldorg_fr}):
+            for doc in connection.domains.find_with_id(
+                    {"domain": record[1][0],
+                     "organization_name_en":oldorg_en,
+                     "organization_name_fr":oldorg_fr}):
+
                 doc["organization_name_en"] = record[0][1]
                 doc["organization_name_fr"] = record[0][2]
                 connection.domains.replace({"_id":doc['_id']}, doc)
@@ -144,12 +153,18 @@ def update_data(
 
         # remove owners
         for record in owner_removals:
-            connection.owners.delete_one({"domain":record[0], "organization_en":record[1], "organization_fr":record[2]})
+            connection.owners.delete_one({
+                "domain":record[0],
+                "organization_en":record[1],
+                "organization_fr":record[2]})
             LOGGER.info("Removed owner.. %s", record)
 
         # add new owners
         for record in owner_additions:
-            connection.owners.create({"domain":record[0], "organization_en":record[1], "organization_fr":record[2]})
+            connection.owners.create({
+                "domain":record[0],
+                "organization_en":record[1],
+                "organization_fr":record[2]})
             LOGGER.info("Created owner.. %s", record)
 
     if ciphers:
@@ -179,4 +194,5 @@ def update_data(
             connection.ciphers.create({"cipher":record})
             LOGGER.info("Created cipher.. %s", record)
 
-        LOGGER.warning("'Track Web results will show old cipher compliance results until a new 'tracker run' is completed.")
+        LOGGER.warning("'Track Web results will show old cipher compliance results"
+                       " until a new 'tracker run' is completed.")

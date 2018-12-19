@@ -68,7 +68,7 @@ def test_update_data(connection: models.Connection) -> None:
         write_to_sio(owners_io, owner_writer, owners, False)
         write_to_sio(domains_io, domain_writer, domains, False)
         write_to_sio(ciphers_io, cipher_writer, ciphers, False)
-        
+
         preprocess.update_data(owners_io, domains_io, ciphers_io, connection)
 
         assert sorted(
