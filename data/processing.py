@@ -133,6 +133,12 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
         LOGGER.info("Replacing government-wide totals.")
         connection.reports.replace({}, report)
 
+        LOGGER.info("Saving report to historical collection")
+        report2 = report.copy();
+        # to be able to query reports by date
+        report2['report_timestamp']=datetime.datetime.today()
+        connection.historical.create(report2)
+
         LOGGER.info("Update cache validity with current time for track-web")
         connection.flags.replace({}, {"cache": datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M")})
 
