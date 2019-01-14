@@ -286,5 +286,10 @@ class Connection():
     def flags(self) -> _Collection:
         return _Collection(self._client, 'flags')
 
+    @property
+    def historical(self) -> _Collection:
+        return _Collection(self._client, 'historical')
+
+
     def close(self) -> None:
         self._client.close()
