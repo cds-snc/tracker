@@ -65,7 +65,7 @@ def scan_domains(
         domains,
         "--scan=%s" % ','.join(scanners),
         "--output=%s" % output,
-        # "--debug", # always capture full output
+        "--debug", # always capture full output
         "--sort",
         "--meta",
     ]
