@@ -150,8 +150,8 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
         remote_in_org = [document['slug'] for document in connection.organizations.all()]
 
         connection.organizations.upsert_all(
-         (organizations[organization_name] for organization_name in sorted_organizations),
-         'name_en', batch_size=batch_size)
+            (organizations[organization_name] for organization_name in sorted_organizations),
+            'name_en', batch_size=batch_size)
 
         # use set logic to find the set of input_domains that need to be removed
         id_removals = set(remote_in_org) - set(sorted_organizations)
