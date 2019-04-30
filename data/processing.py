@@ -129,7 +129,8 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
         # add scan date in all domain records
         scan_date(results, date)
 
-        connection.domains.upsert_all((results[domain_name] for domain_name in sorted_domains), 'domain', batch_size = batch_size)
+        connection.domains.upsert_all((results[domain_name] for domain_name in sorted_domains),
+                                      'domain', batch_size=batch_size)
 
         LOGGER.info("Domain removals: %s", id_removals)
         # Delete domain results from 'domains' table
@@ -149,8 +150,8 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
         remote_in_org = [document['slug'] for document in connection.organizations.all()]
 
         connection.organizations.upsert_all(
-                (organizations[organization_name] for organization_name in sorted_organizations), 'name_en', batch_size=batch_size
-             )
+         (organizations[organization_name] for organization_name in sorted_organizations),
+         'name_en', batch_size=batch_size)
 
         # use set logic to find the set of input_domains that need to be removed
         id_removals = set(remote_in_org) - set(sorted_organizations)
@@ -864,5 +865,5 @@ def boolean_for(string):
 
 # set scan date in for all records
 def scan_date(documents: typing.Iterable[typing.Dict], date: str):
-    for key, value in documents.items():
+    for value in documents.values():
         value.update({"scan_date": date})
