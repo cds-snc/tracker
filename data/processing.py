@@ -151,14 +151,16 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
 
         connection.organizations.upsert_all(
             (organizations[organization_name] for organization_name in sorted_organizations),
-            'name_en', batch_size=batch_size)
+            'slug', batch_size=batch_size)
 
         # use set logic to find the set of input_domains that need to be removed
         id_removals = set(remote_in_org) - set(sorted_organizations)
 
+        LOGGER.info("Organization removals: %s", id_removals)
+
         # Delete org results from 'organizations' table
         for record in id_removals:
-            resp = connection.organizations.delete_one({"name_en": record})
+            resp = connection.organizations.delete_one({"slug": record})
             if resp.deleted_count != 1:
                 LOGGER.error("Failed deletion of organization from 'organizations' collection: %s", record)
             else:
@@ -863,7 +865,7 @@ def boolean_for(string):
     return None
 
 
-# set scan date in for all records
+# set scan date for all records
 def scan_date(documents: typing.Iterable[typing.Dict], date: str):
     for value in documents.values():
         value.update({"scan_date": date})
