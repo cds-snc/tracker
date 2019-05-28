@@ -682,10 +682,10 @@ def https_behavior_for(pshtt, sslyze, accepted_ciphers, parent_preloaded=None):
 
     https_compliant = (behavior >= 2) and (hsts >= 2)
     # Very specific and intentional checks on bod_crypto and good_cert
-    #   - bod_crypto != 0 means it could be -1, which is an indication that we did not get results
-    #     and so are giving them the benifit of the doubt
-    #   - good_cert is not False means it can be None, which has the same meaning as above
-    itpin_compliant = https_compliant and bod_crypto != 0 and good_cert is not False
+    #   - bod_crypto if -1, which is an indication that we did not get results
+    #     and therefore it can't be ITPIN compliant
+    #   - good_cert has to be true in order to be compliant as well i.e. can't be None
+    itpin_compliant = https_compliant and bod_crypto > 0 and good_cert
     report["compliant"] = int(itpin_compliant) # Cast to int to help presentation layer
 
     return report
