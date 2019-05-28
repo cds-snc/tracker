@@ -84,6 +84,7 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
                 "sources": ["canada-gov"],
                 "live": True,
                 "redirect": boolean_for(pshtt["Redirect"]),
+                "redirect_url": urlparse(pshtt["Redirect To"]).geturl(),
                 "canonical": pshtt["Canonical URL"],
                 "exclude": {},
             }
