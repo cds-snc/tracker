@@ -62,8 +62,6 @@ jobs:
       replaceExistingArchive: true 
     displayName: 'Create OfflinePackage (tarball)'
 
- displayName: 'Upload OfflinePackage to Artifacts'
-
   - task: PublishBuildArtifacts@1
     inputs:
       artifactName: 'OfflinePackageWebTracker'
