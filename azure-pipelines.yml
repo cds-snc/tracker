@@ -41,7 +41,7 @@ jobs:
     inputs:
       sourceFolder: '$(Build.SourcesDirectory)'
       contents: |
-        track/**
+        **
         requirements.txt
       targetFolder: '$(Build.ArtifactStagingDirectory)/Staging'
       cleanTargetFolder: true
