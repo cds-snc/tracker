@@ -2,7 +2,6 @@
 # Create and test a Python package on multiple Python versions.
 # Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/languages/python
-#testing
 trigger:
 - hotfix*
 - task*
@@ -17,7 +16,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.5'
+      versionSpec: '3.6'
       architecture: 'x64'
 
   - script: python -m pip install --upgrade pip && pip install -r requirements.txt
@@ -32,7 +31,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.5'
+      versionSpec: '3.6'
       architecture: 'x64'
 
   - script: python -m pip install --upgrade pip
