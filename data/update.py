@@ -89,6 +89,12 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
                     curWriter = csv.writer(r)
                     curWriter.writerow(curRow)
 
+            dedupedPath = str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv'))
+
+            LOGGER.info("Scanning new domains.")
+            scan_domains(options, scan_command, scanners, dedupedPath, output)
+            LOGGER.info("Scan of new domains complete.")
+
             os.remove(str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv')))
 
         # If the domainHistory directory has NOT been created, create the directory and load the csv with domain list
@@ -98,11 +104,10 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
                 histWriter = csv.writer(r)
                 for curRow in curReader:
                         histWriter.writerow(curRow)
-
-        # 1c. Scan domains for all types of things.
-        LOGGER.info("Scanning new domains.")
-        scan_domains(options, scan_command, scanners, domains, output)
-        LOGGER.info("Scan of new domains complete.")
+                        # 1c. Scan domains for all types of things.
+            LOGGER.info("Scanning new domains.")
+            scan_domains(options, scan_command, scanners, domains, output)
+            LOGGER.info("Scan of new domains complete.")
 
     # If user opted to scan entire domain list
     if option.lower() == 'n':
