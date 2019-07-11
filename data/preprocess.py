@@ -11,26 +11,17 @@ def pull_data(output: str, connection: models.Connection) -> None:
     os.makedirs(output, exist_ok=True)
 
     domain_path = os.path.join(output, 'domains.csv')
-    owner_path = os.path.join(output, 'owners.csv')
     cipher_path = os.path.join(output, 'ciphers.csv')
 
     with open(domain_path, 'w', newline='', encoding='utf-8') as domain_file, \
-         open(owner_path, 'w', newline='', encoding='utf-8') as owner_file, \
          open(cipher_path, 'w', newline='', encoding='utf-8') as cipher_file:
 
-        owner_writer = csv.DictWriter(
-            owner_file,
-            fieldnames=['domain', 'organization_en', 'organization_fr'],
-            extrasaction='ignore'
-        )
-        domain_writer = csv.DictWriter(domain_file, fieldnames=['domain'], extrasaction='ignore')
+        domain_writer = csv.DictWriter(domain_file,
+            fieldnames=['domain', 'organization_en', 'organization_fr'], extrasaction='ignore')
         cipher_writer = csv.DictWriter(cipher_file, fieldnames=['cipher'], extrasaction='ignore')
         domain_writer.writeheader()
-        owner_writer.writeheader()
         cipher_writer.writeheader()
 
-        for document in connection.owners.all():
-            owner_writer.writerow(document)
         for document in connection.input_domains.all():
             domain_writer.writerow(document)
         for document in connection.ciphers.all():
@@ -38,7 +29,6 @@ def pull_data(output: str, connection: models.Connection) -> None:
 
 
 def insert_data(
-        owners: typing.Optional[typing.IO[str]],
         domains: typing.Optional[typing.IO[str]],
         ciphers: typing.Optional[typing.IO[str]],
         upsert: bool,
@@ -48,8 +38,6 @@ def insert_data(
 
     insertions = []
 
-    if owners:
-        insertions.append(('owners', 'domain', csv.DictReader(owners)))
     if domains:
         insertions.append(('input_domains', 'domain', csv.DictReader(domains)))
     if ciphers:
@@ -64,7 +52,6 @@ def insert_data(
         method(document for document in reader)
 
 def update_data(
-        owners: typing.Optional[typing.IO[str]],
         domains: typing.Optional[typing.IO[str]],
         ciphers: typing.Optional[typing.IO[str]],
         connection: models.Connection
@@ -102,9 +89,9 @@ def update_data(
         for record in id_additions:
             connection.input_domains.create({'domain':record})
 
-    if owners:
-        # Get updated list of owners
-        owner_reader = csv.DictReader(owners)
+    if domains:
+        # Get updated list of owners from the domain list
+        owner_reader = csv.DictReader(domains)
         new_owners = [(record) for record in owner_reader]
         new_owners_set = []
         for record in new_owners:
