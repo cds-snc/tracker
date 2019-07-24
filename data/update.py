@@ -89,6 +89,8 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
                     else:
                         found = False
 
+            deduped.close()
+            domainHistory.close()
             dedupedPath = str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv'))
 
             LOGGER.info("Scanning new domains.")
@@ -126,6 +128,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
                         histWriter.writerow(curRow)
                     else:
                         found = False
+            domainHistory.close()
         # Else create the file and load it with all domains on the domain list
         else:
             os.makedirs(str(os.path.join(os.getcwd(), 'data/domainHistory')))
