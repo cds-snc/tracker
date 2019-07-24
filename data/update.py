@@ -70,8 +70,8 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
             domainHistory = open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'r')
             deduped = open(str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv')), 'w+')
             dedupedWriter = csv.writer(deduped)
-            dedupedReader = csv.reader(deduped, delimiter=',')
             histReader = csv.reader(domainHistory, delimiter=',')
+            first_row = True
 
             # Append new domains to the domainHistory and create the intermediary deduped domain list
             with open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'a') as r:
@@ -80,14 +80,14 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
                     for histRow in histReader:
                         if curRow == histRow:
                             found = True
+                            break
                     if found is False:
                         histWriter.writerow(curRow)
                         dedupedWriter.writerow(curRow)
-
-            for curRow in dedupedReader:
-                with open(domains, 'w+') as r:
-                    curWriter = csv.writer(r)
-                    curWriter.writerow(curRow)
+                    elif first_row:
+                        dedupedWriter.writerow(curRow)
+                    else:
+                        found = False
 
             dedupedPath = str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv'))
 
@@ -121,8 +121,11 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
                     for histRow in histReader:
                         if curRow == histRow:
                             found = True
+                            break
                     if found is False:
                         histWriter.writerow(curRow)
+                    else:
+                        found = False
         # Else create the file and load it with all domains on the domain list
         else:
             os.makedirs(str(os.path.join(os.getcwd(), 'data/domainHistory')))
