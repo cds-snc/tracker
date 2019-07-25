@@ -23,7 +23,7 @@ import re
 import subprocess
 import typing
 from urllib.parse import urlparse
-from shutil import copyfile, copy, copytree, Error
+from shutil import copyfile, copytree, Error
 import slugify
 
 # Import all the constants from data/env.py.
@@ -118,7 +118,7 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
     report["report_date"] = date
 
     # Backup cached results to the specified directory ahead of database insertions
-    backup_scan_results(pathlib.Path(os.path.join(env.SCAN_DATA, "results")))
+    backup_scan_results(pathlib.Path(env.SCAN_DATA))
 
     # Reset the database.
     with models.Connection(connection_string) as connection:
@@ -212,20 +212,19 @@ def backup_scan_results(path: pathlib.Path):
     # If the backup results directory has NOT been created, create it along with subdirectories
     if not os.path.isdir(str(os.path.join(os.getcwd(), 'data/backupScanResults'))):
         os.mkdir(str(os.path.join(os.getcwd(), 'data/backupScanResults')))
-        if not os.path.isdir(str(os.path.join(os.getcwd(), 'data/backupScanResults/results'))):
-            os.mkdir(str(os.path.join(os.getcwd(), 'data/backupScanResults/results')))
-        if not os.path.isdir(str(os.path.join(os.getcwd(), 'data/backupScanResults/cache'))):
-            os.mkdir(str(os.path.join(os.getcwd(), 'data/backupScanResults/cache')))
+
+    result_path = os.path.join(os.getcwd(), 'data/backupScanResults/results')
+    cache_path = os.path.join(os.getcwd(), 'data/backupScanResults/cache')
 
     # Attempt to copy result directory
     try:
-        copytree(str(os.path.join(str(path), 'results')), str(os.path.join(os.getcwd(), 'data/backupScanResults/results')))
+        copytree(str(os.path.join(str(path), 'results')), str(os.path.join(result_path, str(datetime.datetime.now()))))
     except Error as e:
         LOGGER.exception("Error occurred while backing up scan result files: " + str(e))
 
     # Attempt to copy cache directory
     try:
-        copytree(str(os.path.join(str(path), 'cache')), str(os.path.join(os.getcwd(), 'data/backupScanResults/cache')))
+        copytree(str(os.path.join(str(path), 'cache')), str(os.path.join(cache_path, str(datetime.datetime.now()))))
     except Error as e:
         LOGGER.exception("Error occurred while backing up scan cache files: " + str(e))
 
