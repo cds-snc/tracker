@@ -23,7 +23,7 @@ import re
 import subprocess
 import typing
 from urllib.parse import urlparse
-from shutil import copyfile, copy
+from shutil import copyfile, copy, copytree, Error
 import slugify
 
 # Import all the constants from data/env.py.
@@ -209,10 +209,25 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
     print_report(report)
 
 def backup_scan_results(path: pathlib.Path):
-    # Iterate through each cached results file
-    for file in os.listdir(str(path)):
-        # Copy the file to a directory to be backed up to azure cloud storage
-        copy(str(os.path.join(str(path), str(file))), str(os.path.join(os.getcwd(), 'data/backupScanResults')))
+    # If the backup results directory has NOT been created, create it along with subdirectories
+    if not os.path.isdir(str(os.path.join(os.getcwd(), 'data/backupScanResults'))):
+        os.mkdir(str(os.path.join(os.getcwd(), 'data/backupScanResults')))
+        if not os.path.isdir(str(os.path.join(os.getcwd(), 'data/backupScanResults/results'))):
+            os.mkdir(str(os.path.join(os.getcwd(), 'data/backupScanResults/results')))
+        if not os.path.isdir(str(os.path.join(os.getcwd(), 'data/backupScanResults/cache'))):
+            os.mkdir(str(os.path.join(os.getcwd(), 'data/backupScanResults/cache')))
+
+    # Attempt to copy result directory
+    try:
+        copytree(str(os.path.join(str(path), 'results')), str(os.path.join(os.getcwd(), 'data/backupScanResults/results')))
+    except Error as e:
+        LOGGER.exception("Error occurred while backing up scan result files: " + str(e))
+
+    # Attempt to copy cache directory
+    try:
+        copytree(str(os.path.join(str(path), 'cache')), str(os.path.join(os.getcwd(), 'data/backupScanResults/cache')))
+    except Error as e:
+        LOGGER.exception("Error occurred while backing up scan cache files: " + str(e))
 
 def cache_file(uri: str) -> pathlib.Path:
     LOGGER.info("caching %s", uri)
