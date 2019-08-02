@@ -25,6 +25,7 @@ import typing
 from urllib.parse import urlparse
 from shutil import copyfile, copytree, Error
 import slugify
+import pymongo.errors
 
 # Import all the constants from data/env.py.
 from data import env
@@ -176,8 +177,24 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
             LOGGER.info("Creating all domains.")
             connection.domains.create_all((results[domain_name] for domain_name in sorted_domains),
                                           batch_size=batch_size)
-        except Exception:
-            LOGGER.exception("An error was encountered while inserting domains into the database.")
+        except pymongo.errors.DocumentTooLarge:
+            LOGGER.exception("An error was encountered while inserting domains into the database. "
+                             "Document exceeds PyMongo maximum document size.")
+        except pymongo.errors.WriteConcernError as exc:
+            LOGGER.exception("An error was encountered while inserting domains into the database"
+                             " (Write Concern Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.WriteError as exc:
+            LOGGER.exception("An error was encountered while inserting domains into the database"
+                             " (Write Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.OperationFailure as exc:
+            LOGGER.exception("An error was encountered while inserting domains into the database"
+                             " (Operation Failure). Exception details: %s", str(exc.details))
+        except pymongo.errors.PyMongoError:
+            LOGGER.exception("An error was encountered while inserting domains into the database"
+                             " (PyMongoError).")
+        except Exception as exc:
+            LOGGER.exception("An unknown error was encountered while inserting domains into the database."
+                             " Exception details: %s", str(exc))
 
         LOGGER.info("Clearing organizations.")
         connection.organizations.clear(batch_size=batch_size)
@@ -187,14 +204,46 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
             connection.organizations.create_all(
                 (organizations[organization_name] for organization_name in sorted_organizations), batch_size=batch_size
             )
-        except Exception:
-            LOGGER.exception("An error was encountered while inserting organizations into the database.")
+        except pymongo.errors.DocumentTooLarge:
+            LOGGER.exception("An error was encountered while inserting organizations into the database. "
+                             "Document exceeds PyMongo maximum document size.")
+        except pymongo.errors.WriteConcernError as exc:
+            LOGGER.exception("An error was encountered while inserting organizations into the database"
+                             " (Write Concern Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.WriteError as exc:
+            LOGGER.exception("An error was encountered while inserting organizations into the database"
+                             " (Write Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.OperationFailure as exc:
+            LOGGER.exception("An error was encountered while inserting organizations into the database"
+                             " (Operation Failure). Exception details: %s", str(exc.details))
+        except pymongo.errors.PyMongoError:
+            LOGGER.exception("An error was encountered while inserting organizations into the database"
+                             " (PyMongoError).")
+        except Exception as exc:
+            LOGGER.exception("An unknown error was encountered while inserting organizations into the database."
+                             " Exception details: %s", str(exc))
 
         try:
             LOGGER.info("Replacing government-wide totals.")
             connection.reports.replace({}, report)
-        except Exception:
-            LOGGER.exception("An error was encountered while replacing government-wide totals within the database.")
+        except pymongo.errors.DocumentTooLarge:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the database. "
+                             "Document exceeds PyMongo maximum document size.")
+        except pymongo.errors.WriteConcernError as exc:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the database"
+                             " (Write Concern Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.WriteError as exc:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the database"
+                             " (Write Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.OperationFailure as exc:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the database"
+                             " (Operation Failure). Exception details: %s", str(exc.details))
+        except pymongo.errors.PyMongoError:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the"
+                             " database (PyMongoError).")
+        except Exception as exc:
+            LOGGER.exception("An unknown error was encountered while replacing government-wide totals within the"
+                             " database. Exception details: %s", str(exc))
 
         LOGGER.info("Saving report to historical collection")
         report2 = report.copy()
@@ -219,15 +268,14 @@ def backup_scan_results(path: pathlib.Path):
     # Attempt to copy result directory
     try:
         copytree(str(os.path.join(str(path), 'results')), str(os.path.join(result_path, str(datetime.datetime.now()))))
-    except Error as e:
-        LOGGER.exception("Error occurred while backing up scan result files: " + str(e))
+    except Error as err:
+        LOGGER.exception("Error occurred while backing up scan result files: %s", str(err))
 
     # Attempt to copy cache directory
     try:
         copytree(str(os.path.join(str(path), 'cache')), str(os.path.join(cache_path, str(datetime.datetime.now()))))
-    except Error as e:
-        LOGGER.exception("Error occurred while backing up scan cache files: " + str(e))
-
+    except Error as err:
+        LOGGER.exception("Error occurred while backing up scan cache files: %s", str(err))
 def cache_file(uri: str) -> pathlib.Path:
     LOGGER.info("caching %s", uri)
     mkdir_p(SCAN_CACHE)
