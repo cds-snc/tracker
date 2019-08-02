@@ -12,6 +12,8 @@ import typing
 from data import env
 
 from data import logger
+import os
+import csv
 
 LOGGER = logger.get_logger(__name__)
 
@@ -45,11 +47,100 @@ LOGGER = logger.get_logger(__name__)
 
 def update(scanners: typing.List[str], domains: str, output: str, options):
     scan_command = env.SCAN_COMMAND
+    option = ""
+    flag = False
+    found = False
 
-    # 1c. Scan domains for all types of things.
-    LOGGER.info("Scanning domains.")
-    scan_domains(options, scan_command, scanners, domains, output)
-    LOGGER.info("Scan of domains complete.")
+    file = open(domains, 'r')
+    curReader = csv.reader(file, delimiter=',')
+
+    while flag is False:
+        option = input("Would you like to skip previously scanned domains? (Y/N)")
+        if option.lower() != 'y' and option.lower() != 'n':
+            print("Please make a valid selection.")
+        else:
+            flag = True
+
+    # If user opted NOT to submit previously scanned duplicate domains
+    if option.lower() == 'y':
+
+        # If the domainHistory directory has already been created
+        if os.path.exists(str(os.path.join(os.getcwd(), 'data/domainHistory'))):
+            LOGGER.info("Iterating through domains.csv to find previously scanned domains")
+            domainHistory = open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'r')
+            deduped = open(str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv')), 'w+')
+            dedupedWriter = csv.writer(deduped)
+            histReader = csv.reader(domainHistory, delimiter=',')
+            first_row = True
+
+            # Append new domains to the domainHistory and create the intermediary deduped domain list
+            with open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'a') as r:
+                histWriter = csv.writer(r)
+                for curRow in curReader:
+                    for histRow in histReader:
+                        if curRow == histRow:
+                            found = True
+                            break
+                    if found is False:
+                        histWriter.writerow(curRow)
+                        dedupedWriter.writerow(curRow)
+                    elif first_row:
+                        dedupedWriter.writerow(curRow)
+                    else:
+                        found = False
+
+            deduped.close()
+            domainHistory.close()
+            dedupedPath = str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv'))
+
+            LOGGER.info("Scanning new domains.")
+            scan_domains(options, scan_command, scanners, dedupedPath, output)
+            LOGGER.info("Scan of new domains complete.")
+
+            os.remove(str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv')))
+
+        # If the domainHistory directory has NOT been created, create the directory and load the csv with domain list
+        else:
+            os.makedirs(str(os.path.join(os.getcwd(), 'data/domainHistory')))
+            with open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'w+') as r:
+                histWriter = csv.writer(r)
+                for curRow in curReader:
+                        histWriter.writerow(curRow)
+                        # 1c. Scan domains for all types of things.
+            LOGGER.info("Scanning new domains.")
+            scan_domains(options, scan_command, scanners, domains, output)
+            LOGGER.info("Scan of new domains complete.")
+
+    # If user opted to scan entire domain list
+    if option.lower() == 'n':
+        # If the domainHistory file exists, update the file
+        if os.path.exists(str(os.path.join(os.getcwd(), 'data/domainHistory'))):
+            domainHistory = open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'r')
+            histReader = csv.reader(domainHistory, delimiter=',')
+            with open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'a') as r:
+                histWriter = csv.writer(r)
+                for curRow in curReader:
+                    for histRow in histReader:
+                        if curRow == histRow:
+                            found = True
+                            break
+                    if found is False:
+                        histWriter.writerow(curRow)
+                    else:
+                        found = False
+            domainHistory.close()
+        # Else create the file and load it with all domains on the domain list
+        else:
+            os.makedirs(str(os.path.join(os.getcwd(), 'data/domainHistory')))
+            with open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'w+') as r:
+                histWriter = csv.writer(r)
+                for curRow in curReader:
+                    histWriter.writerow(curRow)
+
+        # 1c. Scan domains for all types of things.
+        LOGGER.info("Scanning domains.")
+        scan_domains(options, scan_command, scanners, domains, output)
+        LOGGER.info("Scan of domains complete.")
 
 
 # Run pshtt on each gathered set of domains.
