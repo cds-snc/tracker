@@ -12,9 +12,9 @@ import typing
 from data import env
 
 from data import logger
+from data import models
 import os
 import csv
-import models
 
 LOGGER = logger.get_logger(__name__)
 
