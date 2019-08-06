@@ -15,6 +15,7 @@ from data import logger
 from data import models
 import os
 import csv
+import click
 
 LOGGER = logger.get_logger(__name__)
 
@@ -46,7 +47,7 @@ LOGGER = logger.get_logger(__name__)
 # options
 #     options to pass along to scan and gather operations
 
-def update(scanners: typing.List[str], domains: str, output: str, options):
+def update(scanners: typing.List[str], domains: str, output: str, options, ctx: click.core.Context):
     scan_command = env.SCAN_COMMAND
     option = ""
     flag = False
@@ -68,7 +69,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
         deduped = open(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')), 'w+')
         dedupedWriter = csv.writer(deduped)
         first_row = True
-        with models.Connection(models.Connection.connection_string()) as connection:
+        with models.Connection(ctx.obj.get("connection_string")) as connection:
             for curRow in curReader:
                 if first_row:
                     dedupedWriter.writerow(curRow)
@@ -95,7 +96,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
     if option.lower() == 'n':
         LOGGER.info("Iterating through domains.csv to update domain history...")
         first_row = True
-        with models.Connection(models.Connection.connection_string()) as connection:
+        with models.Connection(ctx.obj.get("connection_string")) as connection:
             for curRow in curReader:
                 if first_row:
                     first_row = False

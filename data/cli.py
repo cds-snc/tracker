@@ -128,7 +128,7 @@ def run(
         domain_scan_args: typing.List[str],
 ) -> None:
 
-    scan.callback(scanner, domains, output, domain_scan_args)
+    scan.callback(scanner, domains, output, domain_scan_args, ctx)
     the_date = get_date(None, "date", date)
     process.callback(the_date)
 
@@ -175,9 +175,10 @@ def scan(
         domains: str,
         output: str,
         domain_scan_args: typing.List[str],
+        ctx: click.core.Context
 ) -> None:
     LOGGER.info("Starting scan")
-    data_update.update(scanner, domains, output, transform_args(domain_scan_args))
+    data_update.update(scanner, domains, output, transform_args(domain_scan_args), ctx)
     LOGGER.info("Finished scan")
 
 
