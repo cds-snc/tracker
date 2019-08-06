@@ -14,6 +14,7 @@ from data import env
 from data import logger
 import os
 import csv
+import models
 
 LOGGER = logger.get_logger(__name__)
 
@@ -63,79 +64,48 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
 
     # If user opted NOT to submit previously scanned duplicate domains
     if option.lower() == 'y':
+        LOGGER.info("Iterating through domains.csv to find previously scanned domains...")
+        deduped = open(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')), 'w+')
+        dedupedWriter = csv.writer(deduped)
+        first_row = True
+        with models.Connection(models.Connection.connection_string()) as connection:
+            for curRow in curReader:
+                if first_row:
+                    dedupedWriter.writerow(curRow)
+                    first_row = False
+                    found = True
+                elif connection.domain_history.find(curRow).results.length:
+                    found = True
+                if found is False:
+                    connection.domain_history.create(curRow)
+                    dedupedWriter.writerow(curRow)
+                else:
+                    found = False
 
-        # If the domainHistory directory has already been created
-        if os.path.exists(str(os.path.join(os.getcwd(), 'data/domainHistory'))):
-            LOGGER.info("Iterating through domains.csv to find previously scanned domains")
-            domainHistory = open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'r')
-            deduped = open(str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv')), 'w+')
-            dedupedWriter = csv.writer(deduped)
-            histReader = csv.reader(domainHistory, delimiter=',')
-            first_row = True
+        deduped.close()
+        dedupedPath = str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv'))
 
-            # Append new domains to the domainHistory and create the intermediary deduped domain list
-            with open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'a') as r:
-                histWriter = csv.writer(r)
-                for curRow in curReader:
-                    for histRow in histReader:
-                        if curRow == histRow:
-                            found = True
-                            break
-                    if found is False:
-                        histWriter.writerow(curRow)
-                        dedupedWriter.writerow(curRow)
-                    elif first_row:
-                        dedupedWriter.writerow(curRow)
-                    else:
-                        found = False
+        LOGGER.info("Scanning new domains.")
+        scan_domains(options, scan_command, scanners, dedupedPath, output)
+        LOGGER.info("Scan of new domains complete.")
 
-            deduped.close()
-            domainHistory.close()
-            dedupedPath = str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv'))
-
-            LOGGER.info("Scanning new domains.")
-            scan_domains(options, scan_command, scanners, dedupedPath, output)
-            LOGGER.info("Scan of new domains complete.")
-
-            os.remove(str(os.path.join(os.getcwd(), 'data/domainHistory/dedupedDomains.csv')))
-
-        # If the domainHistory directory has NOT been created, create the directory and load the csv with domain list
-        else:
-            os.makedirs(str(os.path.join(os.getcwd(), 'data/domainHistory')))
-            with open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'w+') as r:
-                histWriter = csv.writer(r)
-                for curRow in curReader:
-                        histWriter.writerow(curRow)
-                        # 1c. Scan domains for all types of things.
-            LOGGER.info("Scanning new domains.")
-            scan_domains(options, scan_command, scanners, domains, output)
-            LOGGER.info("Scan of new domains complete.")
+        os.remove(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')))
 
     # If user opted to scan entire domain list
     if option.lower() == 'n':
-        # If the domainHistory file exists, update the file
-        if os.path.exists(str(os.path.join(os.getcwd(), 'data/domainHistory'))):
-            domainHistory = open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'r')
-            histReader = csv.reader(domainHistory, delimiter=',')
-            with open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'a') as r:
-                histWriter = csv.writer(r)
-                for curRow in curReader:
-                    for histRow in histReader:
-                        if curRow == histRow:
-                            found = True
-                            break
-                    if found is False:
-                        histWriter.writerow(curRow)
-                    else:
-                        found = False
-            domainHistory.close()
-        # Else create the file and load it with all domains on the domain list
-        else:
-            os.makedirs(str(os.path.join(os.getcwd(), 'data/domainHistory')))
-            with open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'w+') as r:
-                histWriter = csv.writer(r)
-                for curRow in curReader:
-                    histWriter.writerow(curRow)
+        LOGGER.info("Iterating through domains.csv to update domain history...")
+        first_row = True
+        with models.Connection(models.Connection.connection_string()) as connection:
+            for curRow in curReader:
+                if first_row:
+                    first_row = False
+                    found = True
+                elif connection.domain_history.find(curRow).results.length:
+                    found = True
+                if found is False:
+                    connection.domain_history.create(curRow)
+                else:
+                    found = False
 
         # 1c. Scan domains for all types of things.
         LOGGER.info("Scanning domains.")

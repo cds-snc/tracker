@@ -258,6 +258,9 @@ class Connection():
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         self._client.close()
 
+    def connection_string(self):
+        return self._client
+
     @property
     def domains(self) -> _Collection:
         return _Collection(self._client, 'domains')
@@ -289,6 +292,10 @@ class Connection():
     @property
     def historical(self) -> _Collection:
         return _Collection(self._client, 'historical')
+
+    @property
+    def domain_history(self) -> _Collection:
+        return _Collection(self._client, 'domain_history')
 
 
     def close(self) -> None:
