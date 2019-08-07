@@ -71,14 +71,15 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         first_row = True
         with models.Connection(ctx.obj.get("connection_string")) as connection:
             for curRow in curReader:
+                row_dict = {0: curRow[0]}
                 if first_row:
                     dedupedWriter.writerow(curRow)
                     first_row = False
                     found = True
-                elif connection.domain_history.find(curRow).results.length:
+                elif connection.domain_history.find(row_dict) is not None:
                     found = True
                 if found is False:
-                    connection.domain_history.create(curRow)
+                    connection.domain_history.create(row_dict)
                     dedupedWriter.writerow(curRow)
                 else:
                     found = False
@@ -98,13 +99,14 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         first_row = True
         with models.Connection(ctx.obj.get("connection_string")) as connection:
             for curRow in curReader:
+                row_dict = {0: curRow[0]}
                 if first_row:
                     first_row = False
                     found = True
-                elif connection.domain_history.find(curRow).results.length:
+                elif connection.domain_history.find(row_dict) is not None:
                     found = True
                 if found is False:
-                    connection.domain_history.create(curRow)
+                    connection.domain_history.create(row_dict)
                 else:
                     found = False
 
