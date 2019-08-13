@@ -53,9 +53,6 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
     flag = False
     found = False
 
-    file = open(domains, 'r')
-    curReader = csv.reader(file, delimiter=',')
-
     while flag is False:
         option = input("Would you like to skip previously scanned domains? (Y/N)")
         if option.lower() != 'y' and option.lower() != 'n':
@@ -70,17 +67,16 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         dedupedWriter = csv.writer(deduped)
         first_row = True
         with models.Connection(ctx.obj.get("connection_string")) as connection:
-            for curRow in curReader:
-                row_dict = {0: curRow[0]}
+            for doc in connection.input_domains.find():
                 if first_row:
-                    dedupedWriter.writerow(curRow)
+                    dedupedWriter.writerow(doc)
                     first_row = False
                     found = True
-                elif connection.domain_history.find(row_dict) is not None:
+                elif connection.domain_history.find(doc) is not None:
                     found = True
                 if found is False:
-                    connection.domain_history.create(row_dict)
-                    dedupedWriter.writerow(curRow)
+                    connection.domain_history.create(doc)
+                    dedupedWriter.writerow(doc)
                 else:
                     found = False
 
@@ -98,15 +94,14 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         LOGGER.info("Iterating through domains.csv to update domain history...")
         first_row = True
         with models.Connection(ctx.obj.get("connection_string")) as connection:
-            for curRow in curReader:
-                row_dict = {0: curRow[0]}
+            for doc in connection.input_domains.find():
                 if first_row:
                     first_row = False
                     found = True
-                elif connection.domain_history.find(row_dict) is not None:
+                elif connection.domain_history.find(doc) is not None:
                     found = True
                 if found is False:
-                    connection.domain_history.create(row_dict)
+                    connection.domain_history.create(doc)
                 else:
                     found = False
 

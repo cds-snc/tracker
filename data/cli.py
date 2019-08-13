@@ -16,6 +16,7 @@ from data import update as data_update
 from data import processing
 from data import logger
 from data import models
+from data import populate_database
 from data.preprocess import pull_data, update_data
 
 
@@ -127,7 +128,7 @@ def run(
         output: str,
         domain_scan_args: typing.List[str],
 ) -> None:
-
+    populate_database.populate(ctx)
     scan.callback(scanner, domains, output, domain_scan_args, ctx)
     the_date = get_date(None, "date", date)
     process.callback(the_date)
