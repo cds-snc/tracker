@@ -295,8 +295,8 @@ class Connection():
         return _Collection(self._client, 'domain_history')
 
     @property
-    def domains_input(self) -> _Collection:
-        return _Collection(self._client, 'domains_input')
+    def domain_input(self) -> _Collection:
+        return _Collection(self._client, 'domain_input')
 
     def close(self) -> None:
         self._client.close()

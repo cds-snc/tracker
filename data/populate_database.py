@@ -9,4 +9,4 @@ def populate(ctx: click.core.Context):
         curReader = csv.reader(file, delimiter=',')
         for curRow in curReader:
             row_dict = {0: curRow[0]}
-            connection.domains_input.create(row_dict)
+            connection.domain_input.create(row_dict)
