@@ -10,16 +10,15 @@ LOGGER = logger.get_logger(__name__)
 def populate(ctx: click.core.Context):
     first_row = True
     with models.Connection(ctx.obj.get("connection_string")) as connection:
-        for doc in connection.d:
-            connection.input_domains.delete_one(doc)
+        connection.input_domains.drop_collection()
         domain_path = str(os.getcwd()) + '/csv/domains.csv'
         with open(domain_path, 'r') as file:
             curReader = csv.reader(file, delimiter=',')
             for curRow in curReader:
                 row_dict = {'domain': curRow[0], 'organization_en': curRow[2], 'organization_fr': curRow[3]}
-                if len(list(connection.domain_input.find(row_dict))) is 0 and not first_row:
+                if len(list(connection.input_domains.find(row_dict))) is 0 and not first_row:
                     try:
-                        connection.domain_input.create(row_dict)
+                        connection.input_domains.create(row_dict)
                     except pymongo.errors.DocumentTooLarge:
                         LOGGER.exception("An error was encountered while inserting domains into the input database. "
                                          "Document exceeds PyMongo maximum document size.")
