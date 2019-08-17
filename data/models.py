@@ -233,8 +233,15 @@ def _drop_collection(
         client: pymongo.MongoClient,
         collection: str,
         database: typing.Optional[str] = None):
-    collection = client.get_database(database).get_collection(collection)
-    collection.drop()
+    col = client.get_database(database).get_collection(collection)
+    col.drop()
+
+def _return_all(
+        client: pymongo.MongoClient,
+        collection: str,
+        database: typing.Optional[str] = None):
+    col = client.get_database(database).get_collection(collection).find({})
+    return col
 
 
 class _Collection():
@@ -282,6 +289,8 @@ class _Collection():
     def drop_collection(self):
         _drop_collection(self._client, self._name, self._db)
 
+    def return_all(self):
+        return _return_all(self._client, self._name, self._db)
 
 class Connection():
 
