@@ -72,7 +72,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
                     dedupedWriter.writerow(doc)
                     first_row = False
                     found = True
-                elif connection.domain_history.find(doc) is not None:
+                elif len(list(connection.domain_history.find(doc))) is not 0:
                     found = True
                 if found is False:
                     connection.domain_history.create(doc)
@@ -98,7 +98,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
                 if first_row:
                     first_row = False
                     found = True
-                elif connection.domain_history.find(doc) is not None:
+                elif len(list(connection.domain_history.find(doc))) is not 0:
                     found = True
                 if found is False:
                     connection.domain_history.create(doc)
