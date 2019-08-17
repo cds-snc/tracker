@@ -280,7 +280,7 @@ class _Collection():
         return _delete_one(self._client, self._name, query, self._db)
 
     def drop_collection(self):
-        _drop_collection(self._client, self._name, self.db)
+        _drop_collection(self._client, self._name, self._db)
 
 
 class Connection():
@@ -309,10 +309,6 @@ class Connection():
     @property
     def owners(self) -> _Collection:
         return _Collection(self._client, 'owners')
-
-    @property
-    def input_domains(self) -> _Collection:
-        return _Collection(self._client, 'input_domains')
 
     @property
     def ciphers(self) -> _Collection:
