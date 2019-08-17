@@ -69,12 +69,11 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         with models.Connection(ctx.obj.get("connection_string")) as connection:
             for doc in list(connection.domain_input.find({"_collection": "domain_input"})):
                 if first_row:
-                    deduped_writer.writerow(doc)
                     first_row = False
-                    found = True
+                    deduped_writer.writerow(['domain', 'filler', 'organization_en', 'organization_fr'])
                 elif len(list(connection.domain_history.find(doc))) is not 0:
                     found = True
-                if found is False:
+                if found is False and not first_row:
                     connection.domain_history.create(doc)
                     deduped_writer.writerow(doc)
                 else:
@@ -100,10 +99,10 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
                 deduped_writer.writerow(doc)
                 if first_row:
                     first_row = False
+                    deduped_writer.writerow(['domain', 'filler', 'organization_en', 'organization_fr'])
+                if len(list(connection.domain_history.find(doc))) is not 0:
                     found = True
-                elif len(list(connection.domain_history.find(doc))) is not 0:
-                    found = True
-                if found is False:
+                if found is False and not first_row:
                     connection.domain_history.create(doc)
                 else:
                     found = False
