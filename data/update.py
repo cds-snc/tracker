@@ -75,7 +75,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
                     found = True
                 if found is False and not first_row:
                     connection.domain_history.create(doc)
-                    deduped_writer.writerow(doc)
+                    deduped_writer.writerow([doc['domain'], '', doc['organization_en'], doc['organization_fr']])
                 else:
                     found = False
 
@@ -96,14 +96,15 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         first_row = True
         with models.Connection(ctx.obj.get("connection_string")) as connection:
             for doc in list(connection.domain_input.find({"_collection": "domain_input"})):
-                deduped_writer.writerow(doc)
                 if first_row:
                     first_row = False
                     deduped_writer.writerow(['domain', 'filler', 'organization_en', 'organization_fr'])
                 if len(list(connection.domain_history.find(doc))) is not 0:
                     found = True
+                    deduped_writer.writerow([doc['domain'], '', doc['organization_en'], doc['organization_fr']])
                 if found is False and not first_row:
                     connection.domain_history.create(doc)
+                    deduped_writer.writerow([doc['domain'], '', doc['organization_en'], doc['organization_fr']])
                 else:
                     found = False
 
@@ -115,6 +116,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         scan_domains(options, scan_command, scanners, deduped_path, output)
         LOGGER.info("Scan of domains complete.")
 
+        os.remove(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')))
 
 # Run pshtt on each gathered set of domains.
 def scan_domains(
