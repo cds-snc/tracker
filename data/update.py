@@ -67,7 +67,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         deduped_writer = csv.writer(deduped)
         first_row = True
         with models.Connection(ctx.obj.get("connection_string")) as connection:
-            for doc in connection.domain_input.all():
+            for doc in connection.domain_input.return_all():
                 if first_row:
                     deduped_writer.writerow(doc)
                     first_row = False
@@ -96,7 +96,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         deduped_writer = csv.writer(deduped)
         first_row = True
         with models.Connection(ctx.obj.get("connection_string")) as connection:
-            for doc in connection.domain_input.all():
+            for doc in connection.domain_input.return_all():
                 deduped_writer.writerow(doc)
                 if first_row:
                     first_row = False
