@@ -229,6 +229,13 @@ def _delete_one(
                  .get_collection('meta')\
                  .delete_one({'_collection': collection, **query})
 
+def _drop_collection(
+        client: pymongo.MongoClient,
+        collection: str,
+        database: typing.Optional[str] = None):
+    collection = client.get_database(database).get_collection(collection)
+    collection.drop()
+
 
 class _Collection():
 
@@ -271,6 +278,9 @@ class _Collection():
 
     def delete_one(self, query) -> typing.Iterable[typing.Dict]:
         return _delete_one(self._client, self._name, query, self._db)
+
+    def drop_collection(self):
+        _drop_collection(self._client, self._name, self.db)
 
 
 class Connection():

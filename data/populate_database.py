@@ -10,7 +10,7 @@ LOGGER = logger.get_logger(__name__)
 def populate(ctx: click.core.Context):
     first_row = True
     with models.Connection(ctx.obj.get("connection_string")) as connection:
-        for doc in connection.input_domains.all():
+        for doc in connection.d:
             connection.input_domains.delete_one(doc)
         domain_path = str(os.getcwd()) + '/csv/domains.csv'
         with open(domain_path, 'r') as file:
