@@ -179,7 +179,7 @@ def scan(
         ctx: click.core.Context
 ) -> None:
     LOGGER.info("Starting scan")
-    data_update.update(scanner, domains, output, transform_args(domain_scan_args), ctx)
+    data_update.update(scanner, output, transform_args(domain_scan_args), ctx)
     LOGGER.info("Finished scan")
 
 

@@ -47,7 +47,7 @@ LOGGER = logger.get_logger(__name__)
 # options
 #     options to pass along to scan and gather operations
 
-def update(scanners: typing.List[str], domains: str, output: str, options, ctx: click.core.Context):
+def update(scanners: typing.List[str], output: str, options, ctx: click.core.Context):
     scan_command = env.SCAN_COMMAND
     option = ""
     flag = False
