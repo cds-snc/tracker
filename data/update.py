@@ -66,6 +66,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         deduped = open(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')), 'w+')
         deduped_writer = csv.writer(deduped)
         first_row = True
+        # Update the domain_history collection and append new domains to the deduped csv file
         with models.Connection(ctx.obj.get("connection_string")) as connection:
             for doc in list(connection.domain_input.find({"_collection": "domain_input"})):
                 if first_row:
@@ -86,6 +87,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         scan_domains(options, scan_command, scanners, deduped_path, output)
         LOGGER.info("Scan of new domains complete.")
 
+        # Remove intermediary deduped csv file
         os.remove(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')))
 
     # If user opted to scan entire domain list
@@ -94,6 +96,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         deduped = open(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')), 'w+')
         deduped_writer = csv.writer(deduped)
         first_row = True
+        # Update the domain_history collection and append domains to the deduped csv file
         with models.Connection(ctx.obj.get("connection_string")) as connection:
             for doc in list(connection.domain_input.find({"_collection": "domain_input"})):
                 if first_row:
@@ -116,6 +119,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options, ctx: 
         scan_domains(options, scan_command, scanners, deduped_path, output)
         LOGGER.info("Scan of domains complete.")
 
+        # Remove intermediary deduped csv file
         os.remove(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')))
 
 # Run pshtt on each gathered set of domains.

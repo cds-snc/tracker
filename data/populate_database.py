@@ -7,16 +7,21 @@ from data import models
 
 LOGGER = logger.get_logger(__name__)
 
+# This method populates the domain_input database collection with all domains found within domains.csv
 def populate(ctx: click.core.Context):
     first_row = True
     with models.Connection(ctx.obj.get("connection_string")) as connection:
+        # Drop the collection ahead of domain insertions
         connection.domain_input.drop_collection()
+        # Path to domains.csv
         domain_path = str(os.getcwd()) + '/csv/domains.csv'
         with open(domain_path, 'r') as file:
+            # For each domain in domains.csv, create a corresponding document within the domain_input collection
             curReader = csv.reader(file, delimiter=',')
             for curRow in curReader:
                 row_dict = {'domain': curRow[0], 'organization_en': curRow[2], 'organization_fr': curRow[3]}
                 if len(list(connection.domain_input.find(row_dict))) is 0 and not first_row:
+                    # Attempt to create the document
                     try:
                         connection.domain_input.create(row_dict)
                     except pymongo.errors.DocumentTooLarge:
