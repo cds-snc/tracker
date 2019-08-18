@@ -72,7 +72,7 @@ def update(scanners: typing.List[str], output: str, options, ctx: click.core.Con
                 if first_row:
                     first_row = False
                     deduped_writer.writerow(['domain', 'filler', 'organization_en', 'organization_fr'])
-                elif len(list(connection.domain_history.find(doc))) is not 0:
+                if len(list(connection.domain_history.find(doc))) is not 0:
                     found = True
                 if found is False and not first_row:
                     connection.domain_history.create(doc)
