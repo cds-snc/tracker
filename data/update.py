@@ -12,6 +12,10 @@ import typing
 from data import env
 
 from data import logger
+from data import models
+import os
+import csv
+import click
 
 LOGGER = logger.get_logger(__name__)
 
@@ -43,14 +47,80 @@ LOGGER = logger.get_logger(__name__)
 # options
 #     options to pass along to scan and gather operations
 
-def update(scanners: typing.List[str], domains: str, output: str, options):
+def update(scanners: typing.List[str], output: str, options, ctx: click.core.Context):
     scan_command = env.SCAN_COMMAND
+    option = ""
+    flag = False
+    found = False
 
-    # 1c. Scan domains for all types of things.
-    LOGGER.info("Scanning domains.")
-    scan_domains(options, scan_command, scanners, domains, output)
-    LOGGER.info("Scan of domains complete.")
+    while flag is False:
+        option = input("Would you like to skip previously scanned domains? (Y/N)")
+        if option.lower() != 'y' and option.lower() != 'n':
+            print("Please make a valid selection.")
+        else:
+            flag = True
 
+    # If user opted NOT to submit previously scanned duplicate domains
+    if option.lower() == 'y':
+        LOGGER.info("Iterating through domains.csv to find previously scanned domains...")
+        deduped = open(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')), 'w+')
+        deduped_writer = csv.writer(deduped)
+        first_row = True
+        # Update the domain_history collection and append new domains to the deduped csv file
+        with models.Connection(ctx.obj.get("connection_string")) as connection:
+            for doc in list(connection.domain_input.find({"_collection": "domain_input"})):
+                if first_row:
+                    first_row = False
+                    deduped_writer.writerow(['domain', 'filler', 'organization_en', 'organization_fr'])
+                if len(list(connection.domain_history.find(doc))) is not 0:
+                    found = True
+                if found is False and not first_row:
+                    connection.domain_history.create(doc)
+                    deduped_writer.writerow([doc['domain'], '', doc['organization_en'], doc['organization_fr']])
+                else:
+                    found = False
+
+        deduped.close()
+        deduped_path = str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv'))
+
+        LOGGER.info("Scanning new domains.")
+        scan_domains(options, scan_command, scanners, deduped_path, output)
+        LOGGER.info("Scan of new domains complete.")
+
+        # Remove intermediary deduped csv file
+        os.remove(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')))
+
+    # If user opted to scan entire domain list
+    if option.lower() == 'n':
+        LOGGER.info("Iterating through domains.csv to update domain history...")
+        deduped = open(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')), 'w+')
+        deduped_writer = csv.writer(deduped)
+        first_row = True
+        # Update the domain_history collection and append domains to the deduped csv file
+        with models.Connection(ctx.obj.get("connection_string")) as connection:
+            for doc in list(connection.domain_input.find({"_collection": "domain_input"})):
+                if first_row:
+                    first_row = False
+                    deduped_writer.writerow(['domain', 'filler', 'organization_en', 'organization_fr'])
+                if len(list(connection.domain_history.find(doc))) is not 0:
+                    found = True
+                    deduped_writer.writerow([doc['domain'], '', doc['organization_en'], doc['organization_fr']])
+                if found is False and not first_row:
+                    connection.domain_history.create(doc)
+                    deduped_writer.writerow([doc['domain'], '', doc['organization_en'], doc['organization_fr']])
+                else:
+                    found = False
+
+        deduped.close()
+        deduped_path = str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv'))
+
+        # 1c. Scan domains for all types of things.
+        LOGGER.info("Scanning domains.")
+        scan_domains(options, scan_command, scanners, deduped_path, output)
+        LOGGER.info("Scan of domains complete.")
+
+        # Remove intermediary deduped csv file
+        os.remove(str(os.path.join(os.getcwd(), 'data/dedupedDomains.csv')))
 
 # Run pshtt on each gathered set of domains.
 def scan_domains(

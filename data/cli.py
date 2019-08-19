@@ -16,6 +16,7 @@ from data import update as data_update
 from data import processing
 from data import logger
 from data import models
+from data import populate_database
 from data.preprocess import pull_data, update_data
 
 
@@ -127,8 +128,8 @@ def run(
         output: str,
         domain_scan_args: typing.List[str],
 ) -> None:
-
-    scan.callback(scanner, domains, output, domain_scan_args)
+    populate_database.populate(ctx)
+    scan.callback(scanner, domains, output, domain_scan_args, ctx)
     the_date = get_date(None, "date", date)
     process.callback(the_date)
 
@@ -175,9 +176,10 @@ def scan(
         domains: str,
         output: str,
         domain_scan_args: typing.List[str],
+        ctx: click.core.Context
 ) -> None:
     LOGGER.info("Starting scan")
-    data_update.update(scanner, domains, output, transform_args(domain_scan_args))
+    data_update.update(scanner, output, transform_args(domain_scan_args), ctx)
     LOGGER.info("Finished scan")
 
 
@@ -200,12 +202,7 @@ def process(ctx: click.core.Context, date: str) -> None:
     LOGGER.info("[%s] Data now loaded into track-web.", date)
 
 
-@main.command(help="Update DB with modifications to domains and owners list")
-@click.option(
-    "--owners",
-    type=click.File("r", encoding="utf-8-sig"),
-    help="Path to csv of domain owners",
-)
+@main.command(help="Update DB with modifications to domains list")
 @click.option(
     "--domains",
     type=click.File("r", encoding="utf-8-sig"),
@@ -219,11 +216,10 @@ def process(ctx: click.core.Context, date: str) -> None:
 @click.pass_context
 def update(
         ctx: click.core.Context,
-        owners: typing.IO[str],
         domains: typing.IO[str],
         ciphers: typing.IO[str]
 ) -> None:
 
     with models.Connection(ctx.obj.get("connection_string")) as connection:
-        update_data(owners, domains, ciphers, connection)
+        update_data(domains, ciphers, connection)
         LOGGER.info("'tracker update' completed.")

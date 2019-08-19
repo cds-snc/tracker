@@ -138,6 +138,32 @@ def _insert(
         database: typing.Optional[str] = None) -> None:
     client.get_database(database).get_collection('meta').insert_one({'_collection': collection, **document})
 
+def _upsert_one(
+        client: pymongo.MongoClient,
+        collection: str,
+        documents: typing.Iterable[typing.Dict],
+        key_col: str = '_id',
+        database: typing.Optional[str] = None,
+        batch_size: typing.Optional[int] = None) -> None:
+
+    writes = [
+        pymongo.UpdateOne(
+            {'_collection': collection, key_col: document.get(key_col)},
+            {'$set': {'_collection': collection, **document}},
+            upsert=True,
+        ) for document in documents
+    ]
+
+    if not batch_size:
+        _retry_write(writes, client.get_database(database).get_collection('meta').bulk_write, MAX_TRIES)
+    else:
+        document_stream = grouper(batch_size, writes)
+        collect = client.get_database(database).get_collection('meta')
+        method = functools.partial(collect.bulk_write, ordered=False)
+        for chunk in document_stream:
+            to_write = [write for write in chunk]
+            _retry_write(to_write, method, MAX_TRIES)
+
 
 def _upsert_all(
         client: pymongo.MongoClient,
@@ -203,6 +229,13 @@ def _delete_one(
                  .get_collection('meta')\
                  .delete_one({'_collection': collection, **query})
 
+def _drop_collection(
+        client: pymongo.MongoClient,
+        collection: str,
+        database: typing.Optional[str] = None):
+    col = client.get_database(database).get_collection(collection)
+    col.drop()
+
 
 class _Collection():
 
@@ -246,6 +279,8 @@ class _Collection():
     def delete_one(self, query) -> typing.Iterable[typing.Dict]:
         return _delete_one(self._client, self._name, query, self._db)
 
+    def drop_collection(self):
+        _drop_collection(self._client, self._name, self._db)
 
 class Connection():
 
@@ -275,10 +310,6 @@ class Connection():
         return _Collection(self._client, 'owners')
 
     @property
-    def input_domains(self) -> _Collection:
-        return _Collection(self._client, 'input_domains')
-
-    @property
     def ciphers(self) -> _Collection:
         return _Collection(self._client, 'ciphers')
 
@@ -290,6 +321,13 @@ class Connection():
     def historical(self) -> _Collection:
         return _Collection(self._client, 'historical')
 
+    @property
+    def domain_history(self) -> _Collection:
+        return _Collection(self._client, 'domain_history')
+
+    @property
+    def domain_input(self) -> _Collection:
+        return _Collection(self._client, 'domain_input')
 
     def close(self) -> None:
         self._client.close()

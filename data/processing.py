@@ -23,8 +23,9 @@ import re
 import subprocess
 import typing
 from urllib.parse import urlparse
-from shutil import copyfile
+from shutil import copyfile, copytree, Error
 import slugify
+import pymongo.errors
 
 # Import all the constants from data/env.py.
 from data import env
@@ -54,7 +55,7 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
     # Returns dicts of values ready for saving as Domain and Agency objects.
     #
     # Also returns gathered subdomains, which need more filtering to be useful.
-    domains, owners = load_domain_data()
+    domains, domain_owners = load_domain_data()
     results = {}
     acceptable_ciphers = load_compliance_data()
 
@@ -79,8 +80,8 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
 
             results[domain_name] = {
                 "domain": domain_name,
-                "is_owner": domain_name in owners,
-                "is_parent": domain_name in owners,
+                "is_owner": domain_name in domain_owners,
+                "is_parent": domain_name in domain_owners,
                 "sources": ["canada-gov"],
                 "live": True,
                 "redirect": boolean_for(pshtt["Redirect"]),
@@ -90,7 +91,7 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
             }
 
     # Find the parent domain for all domains in the owner list, mutating results in place
-    map_subdomains(results, owners)
+    map_subdomains(results, domain_owners)
 
     # Extract organizations actually used in the set of scanned domains, and their counts
     organizations = extract_orgs(results)
@@ -107,7 +108,7 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
     )
     # Totals scan data for parent domains
     total_reports(
-        results, owners,
+        results, domain_owners,
     )
 
     # Calculate organization-level summaries. Updates `organizations` in-place.
@@ -116,6 +117,9 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
     # Calculate government-wide summaries.
     report = full_report(results)
     report["report_date"] = date
+
+    # Backup cached results to the specified directory ahead of database insertions
+    backup_scan_results(pathlib.Path(env.SCAN_DATA))
 
     # Reset the database.
     with models.Connection(connection_string) as connection:
@@ -167,8 +171,79 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
             else:
                 LOGGER.warning("Organization deleted from 'organizations' collection: %s", record)
 
-        LOGGER.info("Replacing government-wide totals.")
-        connection.reports.replace({}, report)
+        LOGGER.info("Clearing the domains.")
+        connection.domains.clear(batch_size=batch_size)
+        try:
+            LOGGER.info("Creating all domains.")
+            connection.domains.create_all((results[domain_name] for domain_name in sorted_domains),
+                                          batch_size=batch_size)
+        except pymongo.errors.DocumentTooLarge:
+            LOGGER.exception("An error was encountered while inserting domains into the database. "
+                             "Document exceeds PyMongo maximum document size.")
+        except pymongo.errors.WriteConcernError as exc:
+            LOGGER.exception("An error was encountered while inserting domains into the database"
+                             " (Write Concern Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.WriteError as exc:
+            LOGGER.exception("An error was encountered while inserting domains into the database"
+                             " (Write Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.OperationFailure as exc:
+            LOGGER.exception("An error was encountered while inserting domains into the database"
+                             " (Operation Failure). Exception details: %s", str(exc.details))
+        except pymongo.errors.PyMongoError:
+            LOGGER.exception("An error was encountered while inserting domains into the database"
+                             " (PyMongoError).")
+        except Exception as exc:
+            LOGGER.exception("An unknown error was encountered while inserting domains into the database."
+                             " Exception details: %s", str(exc))
+
+        LOGGER.info("Clearing organizations.")
+        connection.organizations.clear(batch_size=batch_size)
+
+        try:
+            LOGGER.info("Creating all organizations.")
+            connection.organizations.create_all(
+                (organizations[organization_name] for organization_name in sorted_organizations), batch_size=batch_size
+            )
+        except pymongo.errors.DocumentTooLarge:
+            LOGGER.exception("An error was encountered while inserting organizations into the database. "
+                             "Document exceeds PyMongo maximum document size.")
+        except pymongo.errors.WriteConcernError as exc:
+            LOGGER.exception("An error was encountered while inserting organizations into the database"
+                             " (Write Concern Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.WriteError as exc:
+            LOGGER.exception("An error was encountered while inserting organizations into the database"
+                             " (Write Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.OperationFailure as exc:
+            LOGGER.exception("An error was encountered while inserting organizations into the database"
+                             " (Operation Failure). Exception details: %s", str(exc.details))
+        except pymongo.errors.PyMongoError:
+            LOGGER.exception("An error was encountered while inserting organizations into the database"
+                             " (PyMongoError).")
+        except Exception as exc:
+            LOGGER.exception("An unknown error was encountered while inserting organizations into the database."
+                             " Exception details: %s", str(exc))
+
+        try:
+            LOGGER.info("Replacing government-wide totals.")
+            connection.reports.replace({}, report)
+        except pymongo.errors.DocumentTooLarge:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the database. "
+                             "Document exceeds PyMongo maximum document size.")
+        except pymongo.errors.WriteConcernError as exc:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the database"
+                             " (Write Concern Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.WriteError as exc:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the database"
+                             " (Write Error). Exception details: %s", str(exc.details))
+        except pymongo.errors.OperationFailure as exc:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the database"
+                             " (Operation Failure). Exception details: %s", str(exc.details))
+        except pymongo.errors.PyMongoError:
+            LOGGER.exception("An error was encountered while replacing government-wide totals within the"
+                             " database (PyMongoError).")
+        except Exception as exc:
+            LOGGER.exception("An unknown error was encountered while replacing government-wide totals within the"
+                             " database. Exception details: %s", str(exc))
 
         LOGGER.info("Saving report to historical collection")
         report2 = report.copy()
@@ -182,7 +257,25 @@ def run(date: typing.Optional[str], connection_string: str, batch_size: typing.O
     # Print and exit
     print_report(report)
 
+def backup_scan_results(path: pathlib.Path):
+    # If the backup results directory has NOT been created, create it along with subdirectories
+    if not os.path.isdir(str(os.path.join(os.getcwd(), 'data/backupScanResults'))):
+        os.mkdir(str(os.path.join(os.getcwd(), 'data/backupScanResults')))
 
+    result_path = os.path.join(os.getcwd(), 'data/backupScanResults/results')
+    cache_path = os.path.join(os.getcwd(), 'data/backupScanResults/cache')
+
+    # Attempt to copy result directory
+    try:
+        copytree(str(os.path.join(str(path), 'results')), str(os.path.join(result_path, str(datetime.datetime.now()))))
+    except Error as err:
+        LOGGER.exception("Error occurred while backing up scan result files: %s", str(err))
+
+    # Attempt to copy cache directory
+    try:
+        copytree(str(os.path.join(str(path), 'cache')), str(os.path.join(cache_path, str(datetime.datetime.now()))))
+    except Error as err:
+        LOGGER.exception("Error occurred while backing up scan cache files: %s", str(err))
 def cache_file(uri: str) -> pathlib.Path:
     LOGGER.info("caching %s", uri)
     mkdir_p(SCAN_CACHE)
@@ -231,11 +324,11 @@ def load_domain_data() -> typing.Tuple[typing.Set, typing.Dict]:
     if not os.path.exists(SCAN_DOMAINS_CSV):
         cache_file(env.DOMAINS)
 
-    owner_path = cache_file(env.OWNERSHIP)
-
     if not os.path.exists(SCAN_DOMAINS_CSV):
         LOGGER.critical("Couldn't download domains.csv")
         exit(1)
+
+    owner_path = pathlib.Path(os.path.join(str(os.getcwd()), SCAN_DOMAINS_CSV))
 
     with owner_path.open('r', encoding='utf-8-sig', newline='') as csvfile:
         for row in csv.reader(csvfile):
@@ -246,24 +339,19 @@ def load_domain_data() -> typing.Tuple[typing.Set, typing.Dict]:
                 continue
 
             domain_name = row[0].lower().strip()
-            organization_name_en = row[1].strip()
-            organization_name_fr = row[2].strip()
-            organization_slug = slugify.slugify(organization_name_en)
+            if len(row) > 1:
+                organization_name_en = row[1].strip()
+                organization_name_fr = row[2].strip()
+                organization_slug = slugify.slugify(organization_name_en)
 
-            if domain_name not in domain_map:
-                domain_map[domain_name] = {
-                    "organization_name_en": organization_name_en,
-                    "organization_name_fr": organization_name_fr,
-                    "organization_slug": organization_slug,
-                }
+                if domain_name not in domain_map:
+                    domain_map[domain_name] = {
+                        "organization_name_en": organization_name_en,
+                        "organization_name_fr": organization_name_fr,
+                        "organization_slug": organization_slug,
+                    }
 
-    with open(SCAN_DOMAINS_CSV, newline="") as csvfile:
-        for row in csv.reader(csvfile):
-            if row[0].lower().startswith("domain"):
-                continue
-
-            domain = row[0].lower().strip()
-            domains.add(domain)
+            domains.add(domain_name)
 
     return domains, domain_map
 
@@ -315,17 +403,17 @@ def load_scan_data(domains: typing.Set[str]) -> typing.Dict:
     return parent_scan_data
 
 
-def map_subdomains(domains, owners):
-    for domain in domains:
-        if not domains[domain]["is_owner"]:
+def map_subdomains(results, domains):
+    for domain in results:
+        if not results[domain]["is_owner"]:
             parts = domain.split('.')
             parent = domain
-            while parts and parent not in owners:
+            while parts and parent not in domains:
                 parts = parts[1:]
                 parent = '.'.join(parts)
 
             if not parts:
-                domains[domain].update({
+                results[domain].update({
                     "base_domain": domain,
                     "is_parent": True,
                     "organization_name_en": 'Government of Canada',
@@ -336,25 +424,24 @@ def map_subdomains(domains, owners):
 
             parent = '.'.join(parts)
 
-            subdomains = owners[parent].setdefault("subdomains", [])
+            subdomains = results[parent].setdefault("subdomains", [])
             subdomains.append(domain)
-            domains[domain].update({
+            results[domain].update({
                 "base_domain": parent,
                 # If the owners was not scanned, let all subdomains become 'parents' so they are displayed
-                "is_parent": parent not in domains,
-                "organization_slug": owners[parent]["organization_slug"],
-                "organization_name_en": owners[parent]["organization_name_en"],
-                "organization_name_fr": owners[parent]["organization_name_fr"],
+                "is_parent": parent not in results,
+                "organization_slug": domains[parent]["organization_slug"],
+                "organization_name_en": domains[parent]["organization_name_en"],
+                "organization_name_fr": domains[parent]["organization_name_fr"],
             })
         else:
-            domains[domain].update({
+            results[domain].update({
                 "base_domain": domain,
                 "is_parent": True,
-                "organization_slug": owners[domain]["organization_slug"],
-                "organization_name_en": owners[domain]["organization_name_en"],
-                "organization_name_fr": owners[domain]["organization_name_fr"],
+                "organization_slug": domains[domain]["organization_slug"],
+                "organization_name_en": domains[domain]["organization_name_en"],
+                "organization_name_fr": domains[domain]["organization_name_fr"],
             })
-
 
 
 # Given the domain data loaded in from CSVs, draw conclusions,
