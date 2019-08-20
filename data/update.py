@@ -47,18 +47,22 @@ LOGGER = logger.get_logger(__name__)
 
 def update(scanners: typing.List[str], domains: str, output: str, options):
     scan_command = env.SCAN_COMMAND
+    option = ""
     flag = False
     found = False
 
     file = open(domains, 'r')
     curReader = csv.reader(file, delimiter=',')
 
-    for arg in options:
-        if str(arg).lower() == '-h':
+    while flag is False:
+        option = input("Would you like to skip previously scanned domains? (Y/N)")
+        if option.lower() != 'y' and option.lower() != 'n':
+            print("Please make a valid selection.")
+        else:
             flag = True
 
     # If user opted NOT to submit previously scanned duplicate domains
-    if flag:
+    if option.lower() == 'y':
 
         # If the domainHistory directory has already been created
         if os.path.exists(str(os.path.join(os.getcwd(), 'data/domainHistory'))):
@@ -108,7 +112,7 @@ def update(scanners: typing.List[str], domains: str, output: str, options):
             LOGGER.info("Scan of new domains complete.")
 
     # If user opted to scan entire domain list
-    if not flag:
+    if option.lower() == 'n':
         # If the domainHistory file exists, update the file
         if os.path.exists(str(os.path.join(os.getcwd(), 'data/domainHistory'))):
             domainHistory = open(str(os.path.join(os.getcwd(), 'data/domainHistory/domains.csv')), 'r')
