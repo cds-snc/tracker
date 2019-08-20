@@ -68,7 +68,7 @@ def update(scanners: typing.List[str], output: str, options, ctx: click.core.Con
         first_row = True
         # Update the domain_history collection and append new domains to the deduped csv file
         with models.Connection(ctx.obj.get("connection_string")) as connection:
-            for doc in list(connection.domain_input.find({"_collection": "domain_input"})):
+            for doc in list(connection.domain_input.all()):
                 if first_row:
                     first_row = False
                     deduped_writer.writerow(['domain', 'filler', 'organization_en', 'organization_fr'])
@@ -98,7 +98,7 @@ def update(scanners: typing.List[str], output: str, options, ctx: click.core.Con
         first_row = True
         # Update the domain_history collection and append domains to the deduped csv file
         with models.Connection(ctx.obj.get("connection_string")) as connection:
-            for doc in list(connection.domain_input.find({"_collection": "domain_input"})):
+            for doc in list(connection.domain_input.all()):
                 if first_row:
                     first_row = False
                     deduped_writer.writerow(['domain', 'filler', 'organization_en', 'organization_fr'])
