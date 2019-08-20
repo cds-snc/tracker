@@ -69,13 +69,13 @@ def test_update_data(connection: models.Connection) -> None:
         write_to_sio(domains_io, domain_writer, domains, False)
         write_to_sio(ciphers_io, cipher_writer, ciphers, False)
 
-        preprocess.update_data(owners_io, domains_io, ciphers_io, connection)
+        preprocess.update_data(domains_io, ciphers_io, connection)
 
         assert sorted(
             [d for d in connection.owners.all()], key=lambda d: d.get('domain')
         ) == sorted(owners, key=lambda d: d.get('domain'))
         assert sorted(
-            [d for d in connection.input_domains.all()], key=lambda d: d.get('domain')
+            [d for d in connection.domain_input.all()], key=lambda d: d.get('domain')
         ) == sorted(domains, key=lambda d: d.get('domain'))
         assert sorted(
             [d for d in connection.ciphers.all()], key=lambda d: d.get('cipher')
@@ -91,12 +91,12 @@ def test_update_data(connection: models.Connection) -> None:
         ciphers[0]['cipher'] = 'MATH_IS_HARD'
         write_to_sio(ciphers_io, cipher_writer, ciphers, True)
 
-        preprocess.update_data(owners_io, domains_io, ciphers_io, connection)
+        preprocess.update_data(domains_io, ciphers_io, connection)
         docs = [d for d in connection.owners.all()]
         assert len(docs) == 3
         assert owners[0] in docs
 
-        docs = [d for d in connection.input_domains.all()]
+        docs = [d for d in connection.domain_input.all()]
         assert len(docs) == 3
         assert domains[0] in docs
 

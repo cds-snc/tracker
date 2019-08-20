@@ -1,6 +1,6 @@
-import click
 import csv
 import os
+import click
 import pymongo.errors
 from data import logger
 from data import models
@@ -17,9 +17,9 @@ def populate(ctx: click.core.Context):
         domain_path = str(os.getcwd()) + '/csv/domains.csv'
         with open(domain_path, 'r') as file:
             # For each domain in domains.csv, create a corresponding document within the domain_input collection
-            curReader = csv.reader(file, delimiter=',')
-            for curRow in curReader:
-                row_dict = {'domain': curRow[0], 'organization_en': curRow[2], 'organization_fr': curRow[3]}
+            cur_reader = csv.reader(file, delimiter=',')
+            for cur_row in cur_reader:
+                row_dict = {'domain': cur_row[0], 'organization_en': cur_row[2], 'organization_fr': cur_row[3]}
                 if len(list(connection.domain_input.find(row_dict))) is 0 and not first_row:
                     # Attempt to create the document
                     try:

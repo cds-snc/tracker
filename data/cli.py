@@ -173,7 +173,6 @@ def preprocess(ctx: click.core.Context, output: typing.Optional[str]) -> None:
 @click.argument("domain-scan-args", nargs=-1, type=click.UNPROCESSED)
 def scan(
         scanner: typing.List[str],
-        domains: str,
         output: str,
         domain_scan_args: typing.List[str],
         ctx: click.core.Context
