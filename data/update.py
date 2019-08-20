@@ -7,15 +7,15 @@
 
 import subprocess
 import typing
+import os
+import csv
+import click
 
 # Import all the constants from data/env.py.
 from data import env
 
 from data import logger
 from data import models
-import os
-import csv
-import click
 
 LOGGER = logger.get_logger(__name__)
 

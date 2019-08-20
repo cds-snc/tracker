@@ -16,8 +16,8 @@ def pull_data(output: str, connection: models.Connection) -> None:
     with open(domain_path, 'w', newline='', encoding='utf-8') as domain_file, \
          open(cipher_path, 'w', newline='', encoding='utf-8') as cipher_file:
 
-        domain_writer = csv.DictWriter(domain_file,
-            fieldnames=['domain', 'organization_en', 'organization_fr'], extrasaction='ignore')
+        domain_writer = csv.DictWriter(domain_file, fieldnames=['domain', 'organization_en', 'organization_fr'],
+                                       extrasaction='ignore')
         cipher_writer = csv.DictWriter(cipher_file, fieldnames=['cipher'], extrasaction='ignore')
         domain_writer.writeheader()
         cipher_writer.writeheader()
