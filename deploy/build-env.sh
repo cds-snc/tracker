@@ -7,7 +7,7 @@ export LANG=en_US.UTF-8
 export LANGUAGE=en_US:en
 export LC_ALL=en_US.UTF-8
 
-mkdir -p domain-scan && wget -q -O - https://api.github.com/repos/18F/domain-scan/tarball | tar xz --strip-components=1 -C domain-scan
+mkdir -p domain-scan && wget -q -O - https://github.com/cds-snc/domain-scan/tarball/master | tar xz --strip-components=1 -C domain-scan
 
 python3.6 -m venv .venv
 . .venv/bin/activate
